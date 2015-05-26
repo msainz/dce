@@ -6,7 +6,7 @@
 
     <groupId>es.valcarcel-sainz.dce</groupId>
     <artifactId>dce-parent</artifactId>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
     <version>0.1-SNAPSHOT</version>
 
     <name>dce parent</name>
@@ -37,8 +37,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
-        <tjmath.version>1.2-SNAPSHOT</tjmath.version>
-        <tjcommon.version>1.0</tjcommon.version>
+        <smile-math.version>1.0.3</smile-math.version>
         <slf4j.version>1.7.12</slf4j.version>
         <log4j12.version>1.2.17</log4j12.version>
         <junit.version>4.12</junit.version>
@@ -54,15 +53,9 @@
     <dependencies>
 
         <dependency>
-            <groupId>de.jungblut.math</groupId>
-            <artifactId>tjungblut-math</artifactId>
-            <version>${tjmath.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>de.jungblut.common</groupId>
-            <artifactId>thomasjungblut-common</artifactId>
-            <version>${tjcommon.version}</version>
+            <groupId>com.github.haifengl</groupId>
+            <artifactId>smile-math</artifactId>
+            <version>${smile-math.version}</version>
         </dependency>
 
         <dependency>
@@ -91,5 +84,41 @@
         </dependency>
 
     </dependencies>
+
+    <build>
+        <sourceDirectory>src/</sourceDirectory>
+        <!--<testSourceDirectory>test/</testSourceDirectory>-->
+        <resources>
+            <resource>
+                <directory>src/</directory>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>2.3.2</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <debug>true</debug>
+                    <optimize>true</optimize>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>2.2.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
