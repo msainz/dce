@@ -115,7 +115,7 @@ public final class CrossEntropyOptimization {
         }
     }
 
-    public static void main(String [] args) {
+    public static void main(String [] args) throws Exception {
 
         MultivariateFunction J = new Rosenbrock();
         final int M = 2;
@@ -135,6 +135,23 @@ public final class CrossEntropyOptimization {
 
         Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
         LOG.debug("solution: " + J.f(((Rosenbrock) J).getSolution()));
+
+        Thread.sleep(3000);
+
+        Trigonometric Jtrig = new Trigonometric();
+        LOG.debug("solution: " + Jtrig.f(Jtrig.SOLUTION));
+        Thread.sleep(3000);
+        mu = new double[Jtrig.M];
+        new Random().nextDoubles(mu, -100d, 100d);
+        sigma = new double[Jtrig.M][Jtrig.M];
+        for (int i = 0; i < Jtrig.M; i++) {
+            sigma[i][i] = 1000;
+        }
+
+        new CrossEntropyOptimization(gammaQuantile, epsilon)
+                .maximize(Jtrig, mu, sigma, maxIter);
+
+        LOG.debug("solution: " + Jtrig.f(Jtrig.SOLUTION));
     }
 
 }
