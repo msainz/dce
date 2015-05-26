@@ -8,10 +8,13 @@
      */
     public class Rosenbrock implements MultivariateFunction {
 
+        private final double[] solution =
+                new double[] { 1d, 100d };
+
         @Override
-        public double f(double [] x) {
-            double x0 = x[0];
-            double x1 = x[1];
-            return Math.pow((1 - x0), 2) + 100 * Math.pow((x1 - x0 * x0), 2);
+        public double f(double [] xy) {
+            double x = xy[0]; double y = xy[1];
+            double a = solution[0]; double b = solution[1];
+            return Math.pow((a - x), 2) + b * Math.pow((y - x * x), 2);
         }
     }
