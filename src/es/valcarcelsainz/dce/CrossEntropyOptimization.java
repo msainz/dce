@@ -14,7 +14,8 @@ import java.util.Arrays;
  */
 public final class CrossEntropyOptimization {
 
-    private static final Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
+    private static final Logger LOG =
+            LogManager.getLogger(CrossEntropyOptimization.class);
 
     private final double gammaQuantile;
     private final double epsilon;
@@ -29,7 +30,7 @@ public final class CrossEntropyOptimization {
     }
 
     private static int computeNumSamplesForIteration(int iteration) {
-        return (int) Math.max(50, Math.pow(iteration, 1.01));
+        return (int) Math.max(500, Math.pow(iteration, 1.01));
     }
 
     private static double computeSmoothingForIteration(int iteration) {
@@ -42,7 +43,7 @@ public final class CrossEntropyOptimization {
         }
     }
 
-    public void minimize(MultivariateFunction J, double [] mu, double [][] sigma, int maxIter) {
+    public void maximize(MultivariateFunction J, double [] mu, double [][] sigma, int maxIter) {
 
         final int M = mu.length;
         LOG.info("initial mu: " + Arrays.toString(mu));
@@ -68,7 +69,11 @@ public final class CrossEntropyOptimization {
                 ys[xsInd] = y;
                 gammaFinder.add(y);
             }
+
             double gamma = gammaFinder.quantile(gammaQuantile);
+
+            // Arrays.sort(ys);
+            // LOG.debug("gamma: " + gamma + " | ys: " + Arrays.toString(ys));
 
             // mu update
             double [] numer = new double[M];
@@ -86,9 +91,9 @@ public final class CrossEntropyOptimization {
             Math.plus(mu, numer);
 
             // sigma update
-            // ...
 
-            LOG.info("i: " + iter + " | mu: " + Arrays.toString(mu));
+
+            LOG.debug("i: " + iter + " | alpha: " + alpha + " | J(mu): " + J.f(mu) + " | mu: " + Arrays.toString(mu));
         }
     }
 
@@ -97,7 +102,7 @@ public final class CrossEntropyOptimization {
         MultivariateFunction J = new Rosenbrock();
         final int M = 2;
         final int maxIter = 500;
-        final double gammaQuantile = 0.75;
+        final double gammaQuantile = 0.9;
         final double epsilon = 1e6;
 
         double [] mu = new double[M];
@@ -108,7 +113,10 @@ public final class CrossEntropyOptimization {
         }
 
         new CrossEntropyOptimization(gammaQuantile, epsilon)
-                .minimize(J, mu, sigma, maxIter);
+                .maximize(J, mu, sigma, maxIter);
+
+        Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
+        LOG.debug("solution: " + J.f(((Rosenbrock)J).getSolution()) );
     }
 
 }
