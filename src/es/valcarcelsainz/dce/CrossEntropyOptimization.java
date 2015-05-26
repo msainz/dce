@@ -3,7 +3,7 @@ package es.valcarcelsainz.dce;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import smile.math.*;
-import smile.math.Math;
+import static smile.math.Math.*;
 import smile.sort.IQAgent;
 import smile.stat.distribution.MultivariateGaussianDistribution;
 import java.util.Arrays;
@@ -26,21 +26,24 @@ public final class CrossEntropyOptimization {
     }
 
     private static double smoothIndicator(double y, double gamma, double epsilon) {
-        return 1 / (1 + Math.exp(-epsilon * (y - gamma)));
+        return 1 / (1 + exp(-epsilon * (y - gamma)));
     }
 
     private static int computeNumSamplesForIteration(int iteration) {
-        return (int) Math.max(500, Math.pow(iteration, 1.01));
+        return (int) max(500, pow(iteration, 1.01));
     }
 
     private static double computeSmoothingForIteration(int iteration) {
-        return 2.0 / Math.pow(iteration + 100, 0.501);
+        return 2.0 / pow(iteration + 100, 0.501);
     }
 
-    private void scalarMult(double scalar, double [] vect) {
-        for(int i=0; i<vect.length; i++) {
-            vect[i] *= scalar;
+    private static double [][] scaleA(double a, double [][] A) {
+        for(int i=0; i<A.length; i++) {
+            for(int j=0; j<A[0].length; j++) {
+                A[i][j] *= a;
+            }
         }
+        return A;
     }
 
     public void maximize(MultivariateFunction J, double [] mu, double [][] sigma, int maxIter) {
@@ -56,12 +59,11 @@ public final class CrossEntropyOptimization {
             MultivariateGaussianDistribution f =
                     new MultivariateGaussianDistribution(mu, sigma);
 
+            // sample from latest surrogate belief distribution f
+            // and compute new elite threshold gamma
             double [][] xs = new double[numSamples][M];
             double [] ys = new double[xs.length];
             IQAgent gammaFinder = new IQAgent(M);
-
-            // sample from latest surrogate belief distribution f
-            // and compute new elite threshold gamma
             for(int xsInd=0; xsInd < numSamples; xsInd++) {
                 double [] x = f.rand();
                 double y = J.f(x);
@@ -75,23 +77,39 @@ public final class CrossEntropyOptimization {
             // Arrays.sort(ys);
             // LOG.debug("gamma: " + gamma + " | ys: " + Arrays.toString(ys));
 
-            // mu update
+            // mu update -- eqn. (32)
+            double [] mu_prev = new double[M];
+            copy(mu, mu_prev); // deep copy mu -> mu_prev
             double [] numer = new double[M];
             double denom = 0d;
             for(int xsInd=0; xsInd < numSamples; xsInd++) {
                 double [] x = xs[xsInd];
                 double y = ys[xsInd];
                 double I = smoothIndicator(y, gamma, epsilon);
-                scalarMult(I, x);
-                Math.plus(numer, x);
+                scale(I, x);
+                plus(numer, x);
                 denom += I;
             }
-            scalarMult(alpha / denom, numer);
-            scalarMult(1d - alpha, mu);
-            Math.plus(mu, numer);
+            scale(alpha / denom, numer);
+            scale(1d - alpha, mu);
+            plus(mu, numer);
 
-            // sigma update
-
+            // sigma update -- eqn. (33)
+            double [][] numer2 = new double[M][M];
+            for(int xsInd=0; xsInd < numSamples; xsInd++) {
+                double [] x = xs[xsInd];
+                double y = ys[xsInd];
+                double I = smoothIndicator(y, gamma, epsilon);
+                minus(x, mu);
+                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
+                double [][] A = new double[][] { x }; // 1 x M
+                plus(numer2, scaleA(I, atamm(A)) ); // M x M
+            }
+            minus(mu_prev, mu);
+            double [][] A = new double[][] { mu_prev }; // 1 x M
+            plus(sigma, atamm(A)); // M x M
+            scaleA(1d - alpha, sigma);
+            plus(sigma, scaleA(alpha / denom, numer2) );
 
             LOG.debug("i: " + iter + " | alpha: " + alpha + " | J(mu): " + J.f(mu) + " | mu: " + Arrays.toString(mu));
         }
@@ -102,8 +120,8 @@ public final class CrossEntropyOptimization {
         MultivariateFunction J = new Rosenbrock();
         final int M = 2;
         final int maxIter = 500;
-        final double gammaQuantile = 0.9;
-        final double epsilon = 1e6;
+        final double gammaQuantile = 0.96;
+        final double epsilon = 1e12;
 
         double [] mu = new double[M];
         new Random().nextDoubles(mu, -100d, 100d);
@@ -116,7 +134,7 @@ public final class CrossEntropyOptimization {
                 .maximize(J, mu, sigma, maxIter);
 
         Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
-        LOG.debug("solution: " + J.f(((Rosenbrock)J).getSolution()) );
+        LOG.debug("solution: " + J.f(((Rosenbrock) J).getSolution()));
     }
 
 }
