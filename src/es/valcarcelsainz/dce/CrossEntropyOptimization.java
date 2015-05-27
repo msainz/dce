@@ -37,6 +37,10 @@ public final class CrossEntropyOptimization {
         return 2.0 / pow(iteration + 100, 0.501);
     }
 
+    /**
+     * A = a * A
+     * Scale each element of a matrix by a constant.
+     */
     private static double [][] scaleA(double a, double [][] A) {
         for(int i=0; i<A.length; i++) {
             for(int j=0; j<A[0].length; j++) {
@@ -44,6 +48,13 @@ public final class CrossEntropyOptimization {
             }
         }
         return A;
+    }
+
+    public void init(double [] mu, double [][] sigma) {
+        new Random().nextDoubles(mu, -100d, 100d);
+        for (int i = 0; i < mu.length; i++) {
+            sigma[i][i] = 1000;
+        }
     }
 
     public void maximize(MultivariateFunction J, double [] mu, double [][] sigma, int maxIter) {
@@ -115,43 +126,49 @@ public final class CrossEntropyOptimization {
         }
     }
 
-    public static void main(String [] args) throws Exception {
+    public static void main(String [] args) throws InterruptedException {
 
-        MultivariateFunction J = new Rosenbrock();
-        final int M = 2;
         final int maxIter = 500;
         final double gammaQuantile = 0.96;
         final double epsilon = 1e12;
 
+        final CrossEntropyOptimization SACE =
+                new CrossEntropyOptimization(gammaQuantile, epsilon);
+
+        /*** Rosenbrock ***/
+
+        GlobalSolutionFunction J = new Rosenbrock();
+        int M = J.getDim();
         double [] mu = new double[M];
-        new Random().nextDoubles(mu, -100d, 100d);
         double [][] sigma = new double[M][M];
-        for (int i = 0; i < M; i++) {
-            sigma[i][i] = 1000;
-        }
+        SACE.init(mu, sigma);
+        SACE.maximize(J, mu, sigma, maxIter);
+        logSolnAndPause(J);
 
-        new CrossEntropyOptimization(gammaQuantile, epsilon)
-                .maximize(J, mu, sigma, maxIter);
+        /*** Trigonometric ***/
 
-        Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
-        LOG.debug("solution: " + J.f(((Rosenbrock) J).getSolution()));
+        J = new Trigonometric();
+        M = J.getDim();
+        mu = new double[M];
+        sigma = new double[M][M];
+        SACE.init(mu, sigma);
+        SACE.maximize(J, mu, sigma, maxIter);
+        logSolnAndPause(J);
 
-        Thread.sleep(3000);
+        /*** Pintér ***/
 
-        Trigonometric Jtrig = new Trigonometric();
-        LOG.debug("solution: " + Jtrig.f(Jtrig.SOLUTION));
-        Thread.sleep(3000);
-        mu = new double[Jtrig.M];
-        new Random().nextDoubles(mu, -100d, 100d);
-        sigma = new double[Jtrig.M][Jtrig.M];
-        for (int i = 0; i < Jtrig.M; i++) {
-            sigma[i][i] = 1000;
-        }
-
-        new CrossEntropyOptimization(gammaQuantile, epsilon)
-                .maximize(Jtrig, mu, sigma, maxIter);
-
-        LOG.debug("solution: " + Jtrig.f(Jtrig.SOLUTION));
+        J = new Pinter();
+        M = J.getDim();
+        mu = new double[M];
+        sigma = new double[M][M];
+        SACE.init(mu, sigma);
+        SACE.maximize(J, mu, sigma, maxIter);
+        logSolnAndPause(J);
     }
 
+    private static void logSolnAndPause(GlobalSolutionFunction J) throws InterruptedException {
+        Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
+        LOG.debug(J.getName() + " | max: " + J.getMax() + " | solution: " + Arrays.toString(J.getSoln()));
+        Thread.sleep(3000);
+    }
 }
