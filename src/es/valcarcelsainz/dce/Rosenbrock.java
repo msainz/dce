@@ -14,7 +14,7 @@ public class Rosenbrock extends GlobalSolutionFunction  {
 
     @Override
     public double [] getSoln() {
-        double [] soln = new double[20];
+        double [] soln = new double[4];
         Arrays.fill(soln, 1.);
         return soln;
     }
