@@ -30,11 +30,11 @@ public final class CrossEntropyOptimization {
     }
 
     private static int computeNumSamplesForIteration(int iteration) {
-        return (int) max(500, pow(iteration, 1.01));
+        return (int) max(500., pow(iteration, 1.01));
     }
 
     private static double computeSmoothingForIteration(int iteration) {
-        return 2.0 / pow(iteration + 100, 0.501);
+        return 2. / pow(iteration + 100., 0.501);
     }
 
     /**
@@ -142,6 +142,7 @@ public final class CrossEntropyOptimization {
             new Rosenbrock(),
             new Trigonometric(),
             new Pinter(),
+            new Powell()
         };
 
         for (GlobalSolutionFunction J : funs) {
