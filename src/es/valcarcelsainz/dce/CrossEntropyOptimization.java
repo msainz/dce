@@ -144,6 +144,7 @@ public final class CrossEntropyOptimization {
             new Pinter(),
             new Powell(),
             new Griewank(),
+            new Shekel(),
         };
 
         for (GlobalSolutionFunction J : funs) {
