@@ -142,7 +142,8 @@ public final class CrossEntropyOptimization {
             new Rosenbrock(),
             new Trigonometric(),
             new Pinter(),
-            new Powell()
+            new Powell(),
+            new Griewank(),
         };
 
         for (GlobalSolutionFunction J : funs) {
