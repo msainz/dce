@@ -132,38 +132,26 @@ public final class CrossEntropyOptimization {
         final double gammaQuantile = 0.96;
         final double epsilon = 1e12;
 
+        double [] mu;
+        double [][] sigma;
+
         final CrossEntropyOptimization SACE =
                 new CrossEntropyOptimization(gammaQuantile, epsilon);
 
-        /*** Rosenbrock ***/
+        GlobalSolutionFunction [] funs = new GlobalSolutionFunction[] {
+            new Rosenbrock(),
+            new Trigonometric(),
+            new Pinter(),
+        };
 
-        GlobalSolutionFunction J = new Rosenbrock();
-        int M = J.getDim();
-        double [] mu = new double[M];
-        double [][] sigma = new double[M][M];
-        SACE.init(mu, sigma);
-        SACE.maximize(J, mu, sigma, maxIter);
-        logSolnAndPause(J);
-
-        /*** Trigonometric ***/
-
-        J = new Trigonometric();
-        M = J.getDim();
-        mu = new double[M];
-        sigma = new double[M][M];
-        SACE.init(mu, sigma);
-        SACE.maximize(J, mu, sigma, maxIter);
-        logSolnAndPause(J);
-
-        /*** Pintér ***/
-
-        J = new Pinter();
-        M = J.getDim();
-        mu = new double[M];
-        sigma = new double[M][M];
-        SACE.init(mu, sigma);
-        SACE.maximize(J, mu, sigma, maxIter);
-        logSolnAndPause(J);
+        for (GlobalSolutionFunction J : funs) {
+            int M = J.getDim();
+            mu = new double[M];
+            sigma = new double[M][M];
+            SACE.init(mu, sigma);
+            SACE.maximize(J, mu, sigma, maxIter);
+            logSolnAndPause(J);
+        }
     }
 
     private static void logSolnAndPause(GlobalSolutionFunction J) throws InterruptedException {

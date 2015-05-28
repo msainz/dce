@@ -1,24 +1,31 @@
 package es.valcarcelsainz.dce;
 
 import static smile.math.Math.*;
+import java.util.Arrays;
 
 /**
- * Implementation of 2-dimensional Rosenbrock function as per
- * http://en.wikipedia.org/wiki/Rosenbrock_function
+ * Implementation of M-dimensional Rosenbrock function as per
+ * http://www.isr.umd.edu/~marcus/docs/MRAS_OR.pdf
+ * page 559, eqn. H_3(x)
  *
  * @author Marcos Sainz
  */
 public class Rosenbrock extends GlobalSolutionFunction  {
 
     @Override
-    public double[] getSoln() {
-        return new double[]{1., 1.};
+    public double [] getSoln() {
+        double [] soln = new double[20];
+        Arrays.fill(soln, 1.);
+        return soln;
     }
 
     @Override
-    public double f(double[] xy) {
-        double x = xy[0];
-        double y = xy[1];
-        return -(pow((1. - x), 2.) + 100. * pow((y - x * x), 2.));
+    public double f(double [] x) {
+        int M = getDim();
+        double sum = 0.;
+        for (int i = 0; i < M-1; i++) {
+            sum += 100.*pow(x[i+1]-pow(x[i],2.),2.) + pow(x[i]-1,2.);
+        }
+        return -sum;
     }
 }

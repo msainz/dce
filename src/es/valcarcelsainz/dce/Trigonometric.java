@@ -13,7 +13,7 @@ import java.util.Arrays;
 public class Trigonometric extends GlobalSolutionFunction {
 
     @Override
-    public double[] getSoln() {
+    public double [] getSoln() {
         double [] soln = new double[20];
         Arrays.fill(soln, .9);
         return soln;
