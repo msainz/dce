@@ -23,6 +23,7 @@ public class Powell extends GlobalSolutionFunction {
 
     @Override
     public double f(double [] x) {
+        checkDim(x);
         int M = getDim();
         double sum = 0.;
         for (int i = 1; i < M-2; i++) {

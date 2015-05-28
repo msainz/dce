@@ -21,6 +21,7 @@ public class Rosenbrock extends GlobalSolutionFunction  {
 
     @Override
     public double f(double [] x) {
+        checkDim(x);
         int M = getDim();
         double sum = 0.;
         for (int i = 0; i < M-1; i++) {

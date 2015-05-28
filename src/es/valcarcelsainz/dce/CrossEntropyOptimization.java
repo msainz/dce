@@ -26,7 +26,7 @@ public final class CrossEntropyOptimization {
     }
 
     private static double smoothIndicator(double y, double gamma, double epsilon) {
-        return 1 / (1 + exp(-epsilon * (y - gamma)));
+        return 1. / (1. + exp(-epsilon * (y - gamma)));
     }
 
     private static int computeNumSamplesForIteration(int iteration) {
@@ -42,8 +42,8 @@ public final class CrossEntropyOptimization {
      * Scale each element of a matrix by a constant.
      */
     private static double [][] scaleA(double a, double [][] A) {
-        for(int i=0; i<A.length; i++) {
-            for(int j=0; j<A[0].length; j++) {
+        for(int i = 0; i < A.length; i++) {
+            for(int j = 0; j < A[0].length; j++) {
                 A[i][j] *= a;
             }
         }
@@ -93,7 +93,7 @@ public final class CrossEntropyOptimization {
             copy(mu, mu_prev); // deep copy mu -> mu_prev
             double [] numer = new double[M];
             double denom = 0d;
-            for(int xsInd=0; xsInd < numSamples; xsInd++) {
+            for(int xsInd = 0; xsInd < numSamples; xsInd++) {
                 double [] x = xs[xsInd];
                 double y = ys[xsInd];
                 double I = smoothIndicator(y, gamma, epsilon);
@@ -107,7 +107,7 @@ public final class CrossEntropyOptimization {
 
             // sigma update -- eqn. (33)
             double [][] numer2 = new double[M][M];
-            for(int xsInd=0; xsInd < numSamples; xsInd++) {
+            for(int xsInd = 0; xsInd < numSamples; xsInd++) {
                 double [] x = xs[xsInd];
                 double y = ys[xsInd];
                 double I = smoothIndicator(y, gamma, epsilon);
@@ -129,7 +129,7 @@ public final class CrossEntropyOptimization {
     public static void main(String [] args) throws InterruptedException {
 
         final int maxIter = 500;
-        final double gammaQuantile = 0.96;
+        final double gammaQuantile = 0.98;
         final double epsilon = 1e12;
 
         double [] mu;
@@ -139,19 +139,20 @@ public final class CrossEntropyOptimization {
                 new CrossEntropyOptimization(gammaQuantile, epsilon);
 
         GlobalSolutionFunction [] funs = new GlobalSolutionFunction[] {
-            new Rosenbrock(),
-            new Trigonometric(),
-            new Pinter(),
-            new Powell(),
-            new Griewank(),
+            new Dejong(),
             new Shekel(),
+            new Rosenbrock(),
+            new Powell(),
+            new Trigonometric(),
+            new Griewank(),
+            new Pinter(),
         };
 
         for (GlobalSolutionFunction J : funs) {
             int M = J.getDim();
             mu = new double[M];
             sigma = new double[M][M];
-            SACE.init(mu, sigma, 0L);
+            SACE.init(mu, sigma, System.currentTimeMillis());
             SACE.maximize(J, mu, sigma, maxIter);
             logSolnAndPause(J);
         }

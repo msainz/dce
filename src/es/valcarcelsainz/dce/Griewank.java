@@ -22,6 +22,7 @@ public class Griewank extends GlobalSolutionFunction {
 
     @Override
     public double f(double [] x) {
+        checkDim(x);
         int M = getDim();
         double sum = 0.;
         double product = 1.;

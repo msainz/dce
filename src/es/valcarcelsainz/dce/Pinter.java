@@ -18,6 +18,7 @@ public class Pinter extends GlobalSolutionFunction {
 
     @Override
     public double f(double[] _x) {
+        checkDim(_x);
         int M = getDim();
         double [] x = new double[M+2];
         System.arraycopy(_x, 0, x, 1, M);

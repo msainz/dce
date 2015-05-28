@@ -24,6 +24,13 @@ public abstract class GlobalSolutionFunction implements MultivariateFunction {
         return getSoln().length;
     }
 
+    public void checkDim(double[] x) {
+        if (x.length != getDim()) {
+            throw new RuntimeException(
+                    getName() + "only supports " + getDim() + " dimensions.");
+        }
+    }
+
     /**
      * Compute the value of the function at its solution.
      */

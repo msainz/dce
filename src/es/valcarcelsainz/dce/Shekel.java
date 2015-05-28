@@ -20,10 +20,7 @@ public class Shekel extends GlobalSolutionFunction {
 
     @Override
     public double f(double [] x) {
-        if (x.length != getDim()) {
-            throw new RuntimeException(
-                getName() + "only supports " + getDim() + " dimensions.");
-        }
+        checkDim(x);
         double [][] a = new double [][] {
                 {4.,4.,4.,4.},
                 {1.,1.,1.,1.},

@@ -21,6 +21,7 @@ public class Trigonometric extends GlobalSolutionFunction {
 
     @Override
     public double f(double [] x) {
+        checkDim(x);
         int M = getDim();
         double sum = 1.;
         for (int i=0; i<M; i++) {
