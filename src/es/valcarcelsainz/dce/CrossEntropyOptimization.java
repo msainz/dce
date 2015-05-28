@@ -50,8 +50,8 @@ public final class CrossEntropyOptimization {
         return A;
     }
 
-    public void init(double [] mu, double [][] sigma) {
-        new Random().nextDoubles(mu, -100d, 100d);
+    public void init(double [] mu, double [][] sigma, final long seed) {
+        new Random(seed).nextDoubles(mu, -100d, 100d);
         for (int i = 0; i < mu.length; i++) {
             sigma[i][i] = 1000;
         }
@@ -149,7 +149,7 @@ public final class CrossEntropyOptimization {
             int M = J.getDim();
             mu = new double[M];
             sigma = new double[M][M];
-            SACE.init(mu, sigma);
+            SACE.init(mu, sigma, 0L);
             SACE.maximize(J, mu, sigma, maxIter);
             logSolnAndPause(J);
         }
