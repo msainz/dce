@@ -126,6 +126,7 @@ public final class CrossEntropyOptimization {
         }
     }
 
+    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.CrossEntropyOptimization"
     public static void main(String [] args) throws InterruptedException {
 
         final int maxIter = 500;
