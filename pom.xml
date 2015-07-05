@@ -38,6 +38,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <smile-math.version>1.0.3</smile-math.version>
+        <jedis.version>2.7.2</jedis.version>
+        <commons-csv.version>1.1</commons-csv.version>
+        <argparse4j.version>0.5.0</argparse4j.version>
         <slf4j.version>1.7.12</slf4j.version>
         <log4j12.version>1.2.17</log4j12.version>
         <junit.version>4.12</junit.version>
@@ -56,6 +59,24 @@
             <groupId>com.github.haifengl</groupId>
             <artifactId>smile-math</artifactId>
             <version>${smile-math.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>${jedis.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>${commons-csv.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.sourceforge.argparse4j</groupId>
+            <artifactId>argparse4j</artifactId>
+            <version>${argparse4j.version}</version>
         </dependency>
 
         <dependency>
