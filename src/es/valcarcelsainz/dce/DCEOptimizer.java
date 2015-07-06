@@ -24,7 +24,7 @@ import java.util.*;
 public class DCEOptimizer {
 
     // mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
-    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -r localhost"
+    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -i 100 -r localhost -l trace"
     public static void main(final String[] args) {
         final ArgumentParser parser = ArgumentParsers
                 .newArgumentParser("dce-optimize")
@@ -66,6 +66,18 @@ public class DCEOptimizer {
 
             Map<Integer, Map<Integer,Double>> agentToNeighborWeightsMap =
                     getAgentToNeighborWeightsMap(parsedArgs);
+            for (Map.Entry<Integer,Map<Integer,Double>> entry : agentToNeighborWeightsMap .entrySet()) {
+                Integer agentId = entry.getKey();
+                Map<Integer, Double> neighWeights = entry.getValue();
+
+                // instantiate dce-agent
+                DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter);
+
+                // subscribe to neighbor updates
+                agent.subscribeToNeighbors();
+
+
+            }
 
         } catch (ArgumentParserException e) {
             parser.handleError(e);
