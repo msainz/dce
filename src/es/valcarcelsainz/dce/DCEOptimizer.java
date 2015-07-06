@@ -72,11 +72,6 @@ public class DCEOptimizer {
 
                 // instantiate dce-agent
                 DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter);
-
-                // subscribe to neighbor updates
-                agent.subscribeToNeighbors();
-
-
             }
 
         } catch (ArgumentParserException e) {
