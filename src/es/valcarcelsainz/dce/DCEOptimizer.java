@@ -64,6 +64,10 @@ public class DCEOptimizer {
             final int maxIter = parsedArgs.getInt("max_iterations");
             logger.info("Running {} max iterations", maxIter);
 
+            final String redisHost = parsedArgs.getString("redis_host");
+            final int redisPort = parsedArgs.getInt("redis_port");
+            logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
+
             Map<Integer, Map<Integer,Double>> agentToNeighborWeightsMap =
                     getAgentToNeighborWeightsMap(parsedArgs);
             for (Map.Entry<Integer,Map<Integer,Double>> entry : agentToNeighborWeightsMap .entrySet()) {
@@ -71,7 +75,7 @@ public class DCEOptimizer {
                 Map<Integer, Double> neighWeights = entry.getValue();
 
                 // instantiate dce-agent
-                DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter);
+                DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter, redisHost, redisPort);
             }
 
         } catch (ArgumentParserException e) {
