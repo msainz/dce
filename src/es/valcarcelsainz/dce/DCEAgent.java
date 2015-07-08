@@ -30,6 +30,7 @@ public class DCEAgent {
     // pace multi-threaded computation
     private final Phaser muPhaser = new Phaser();
     private final Phaser sigmaPhaser = new Phaser();
+    private final GlobalSolutionFunction targetFn; // target to optimize
 
     // TODO: store the two mu's (mu_i and mu_i+1) in array of length 2
     // then as neighbor updates arrive, can do (i % 2) --but how to check for >1 gaps
@@ -37,13 +38,14 @@ public class DCEAgent {
     private StringBuilder mu_i = new StringBuilder("");
 
     public DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
-                    String redisHost, Integer redisPort) {
+                    String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
 
         this.agentId = agentId;
         this.neighWeights = neighWeights;
         this.maxIter = maxIter;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
+        this.targetFn = targetFn;
 
         subscribeToBroadcast();
         subscribeToNeighbors();

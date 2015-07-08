@@ -5,6 +5,7 @@ import net.sourceforge.argparse4j.inf.*;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.lang3.ClassUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.Level;
@@ -24,7 +25,7 @@ import java.util.*;
 public class DCEOptimizer {
 
     // mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
-    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -i 100 -r localhost -l trace"
+    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Rosenbrock -i 3 -r localhost -l trace"
     public static void main(final String[] args) {
         final ArgumentParser parser = ArgumentParsers
                 .newArgumentParser("dce-optimize")
@@ -32,6 +33,11 @@ public class DCEOptimizer {
         parser.addArgument("-w", "--weights-file")
                 .nargs("?")
                 .help("path to tab-delimited file containing Hasting weights");
+        parser.addArgument("-t", "--target-function")
+                .nargs(1)
+                .required(true)
+                .choices("Dejong", "Griewank", "Pinter", "Powell", "Rosenbrock", "Shekel", "Trigonometric")
+                .help("target function to optimize (default: Pinter)");
         parser.addArgument("-o", "--agent-offset")
                 .nargs("?")
                 .type(Integer.class)
@@ -44,8 +50,9 @@ public class DCEOptimizer {
                 .help("maximum number of iterations to run");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")
-                .setDefault("DEBUG")
-                .help("log level (default: DEBUG)");
+                .choices("trace", "debug", "info")
+                .setDefault("debug")
+                .help("log level (default: debug)");
         parser.addArgument("-r", "--redis-host")
                 .nargs("?")
                 .help("redis host acting as message broker");
@@ -61,6 +68,10 @@ public class DCEOptimizer {
 
             setupLogger(parsedArgs.getString("log_level"));
 
+            final GlobalSolutionFunction targetFn = getTargetFn(parsedArgs);
+            logger.info("Target function: {} in M={} dimensions", targetFn.getClass().getName(), targetFn.getDim());
+            logger.trace("Target function known global solution at: {}", Arrays.toString(targetFn.getSoln()));
+
             final int maxIter = parsedArgs.getInt("max_iterations");
             logger.info("Running {} max iterations", maxIter);
 
@@ -75,15 +86,25 @@ public class DCEOptimizer {
                 Map<Integer, Double> neighWeights = entry.getValue();
 
                 // instantiate dce-agent
-                DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter, redisHost, redisPort);
+                DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter, redisHost, redisPort, targetFn);
             }
 
         } catch (ArgumentParserException e) {
             parser.handleError(e);
             System.exit(1);
-        } catch (IOException e) {
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IOException e) {
             e.printStackTrace(System.err);
         }
+    }
+
+    public static GlobalSolutionFunction getTargetFn(Namespace parsedArgs) throws InstantiationException,
+            IllegalAccessException, ClassNotFoundException {
+        String targetFnClassName = String.format("%s.%s",
+                DCEOptimizer.class.getPackage().getName(),
+                parsedArgs.getList("target_function").get(0));
+        final GlobalSolutionFunction targetFn =
+                (GlobalSolutionFunction) ClassUtils.getClass(targetFnClassName).newInstance();
+        return targetFn;
     }
 
     private static Map<Integer, Map<Integer,Double>> getAgentToNeighborWeightsMap(Namespace parsedArgs)
