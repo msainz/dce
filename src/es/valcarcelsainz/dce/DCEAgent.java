@@ -64,13 +64,12 @@ public class DCEAgent {
         for (int k = agentId, i = 0; i < maxIter; i++) {
 
             // compute and publish mu_hat of the current iteration i, eqn. (32)(top)
-            String mu_hat = String.format("mu_hat[%s][%s] ", k, i);
+            String mu_hat = computeMuHat(k, i);
             synchronized (mu_i) {
                 mu_i.append(mu_hat);
             }
 
-            String out = gson.toJson(new Message(i, mu_hat, Message.PayloadType.MU));
-            jedis.publish(Integer.toString(agentId), out);
+            publishMuHat(jedis, gson, mu_hat, k, i);
 
             // wait for all neighbors' mu_hat for current iteration i
             muPhaser.awaitAdvance(i);
@@ -88,6 +87,22 @@ public class DCEAgent {
             logger.info("completed iteration({})", i);
         }
 
+    }
+
+    private void publishMuHat(Jedis jedis, Gson gson, String mu_hat, int k, int i) {
+        String out = gson.toJson(new Message(i, mu_hat, Message.PayloadType.MU));
+        jedis.publish(Integer.toString(k), out);
+    }
+
+    private String computeMuHat(int k, int i) {
+        String mu_hat = null;
+        try {
+            mu_hat = String.format("mu_hat[%s][%s] ", k, i);
+            Thread.sleep(Math.round(Math.random() * 3000)); // sleep between 0 and 3 sec
+        } catch(InterruptedException e) {
+            e.printStackTrace();
+        }
+        return mu_hat;
     }
 
     public void stop() {
