@@ -26,6 +26,7 @@ public class DCEOptimizer {
 
     // mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
     // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Rosenbrock -i 3 -r localhost -l trace"
+    // MAVEN_OPTS="-ea -Xmx10g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -t Rosenbrock -i 5 -r localhost -l debug"
     public static void main(final String[] args) {
         final ArgumentParser parser = ArgumentParsers
                 .newArgumentParser("dce-optimize")

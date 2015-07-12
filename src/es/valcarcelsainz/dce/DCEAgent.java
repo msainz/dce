@@ -8,6 +8,7 @@ import redis.clients.jedis.JedisPubSub;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,11 @@ public class DCEAgent {
             LoggerFactory.getLogger(DCEAgent.class);
 
     private final int agentId; // k
+
+    // TODO: use this instead
+    // http://google-collections.googlecode.com/svn/trunk/javadoc/com/google/common/collect/ImmutableMap.html
     private final Map<Integer, Double> neighWeights;
+
     private final int maxIter;
     private final String redisHost;
     private final int redisPort;
@@ -30,12 +35,15 @@ public class DCEAgent {
     // pace multi-threaded computation
     private final Phaser muPhaser = new Phaser();
     private final Phaser sigmaPhaser = new Phaser();
-    private final GlobalSolutionFunction targetFn; // target to optimize
 
-    // TODO: store the two mu's (mu_i and mu_i+1) in array of length 2
-    // then as neighbor updates arrive, can do (i % 2) --but how to check for >1 gaps
-    // in neighbor updates due to incorrect (e.g. un-reciprocated) hasting weights?
-    private StringBuilder mu_i = new StringBuilder("");
+    // target to optimize
+    private final GlobalSolutionFunction targetFn;
+
+    // mu at each iteration (although we clear unnecessary history as we go)
+    private StringBuilder[] mu;
+
+    // sigma at each iteration (although we clear unnecessary history as we go)
+    private StringBuilder[] sigma;
 
     public DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
                     String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
@@ -46,6 +54,18 @@ public class DCEAgent {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
+
+        mu = new StringBuilder[maxIter + 1];
+        sigma = new StringBuilder[maxIter + 1];
+        for (int i = 0; i <= maxIter; i++) {
+            // init with the smallest-size element
+            mu[i] = new StringBuilder();
+            sigma[i] = new StringBuilder();
+        }
+
+        // init mu and sigma
+        mu[0].append("");
+        sigma[0].append("");
 
         subscribeToBroadcast();
         subscribeToNeighbors();
@@ -58,51 +78,79 @@ public class DCEAgent {
         logger.info("agent({}) started", agentId);
         logger.info("connecting to redis at {}:{}", redisHost, redisPort);
 
-        Gson gson = new Gson();
+        Gson gson = new Gson(); // TODO: make static since it's thread-safe
         Jedis jedis = new Jedis(redisHost, redisPort);
 
-        for (int k = agentId, i = 0; i < maxIter; i++) {
+        for (int i = 1; i <= maxIter; i++) {
 
-            // compute and publish mu_hat of the current iteration i, eqn. (32)(top)
-            String mu_hat = computeMuHat(k, i);
-            synchronized (mu_i) {
-                mu_i.append(mu_hat);
-            }
+            // compute mu_hat of the current iteration i, eqn. (32)(top)
+            String mu_hat = computeMuHat(i);
+            updateMu(i, mu_hat);
 
-            publishMuHat(jedis, gson, mu_hat, k, i);
-
-            // wait for all neighbors' mu_hat for current iteration i
-            muPhaser.awaitAdvance(i);
+            // broadcast my mu_hat to my neighbors
+            publishMuHat(jedis, gson, mu_hat, i);
 
             // compute mu, eqn. (32)(bottom)
+            // wait for all neighbors' mu_hat for current iteration i
+            muPhaser.awaitAdvance(i-1); // phase starts at 0
+
+            // at this point it's safe to clear mu_i-1
+            clearOldMu(i);
 
             // compute and publish sigma_hat of current iteration i, eqn. (33)(top)
 
+            // compute sigma, eqn. (33)(bottom)
             // wait for all neighbors' sigma_hat for current iteration i
             // sigmaPhaser.awaitAdvance(i);
 
-            // compute sigma, eqn. (33)(bottom
+            // at this point it's safe to clear sigma_i-1
+            // clearOldSigma(i);
 
-            logger.trace("mu[{}][{}] = \"{}\"", k, i, mu_i);
+            if (logger.isTraceEnabled()) {
+                synchronized (mu[i]) {
+                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, mu[i]);
+                }
+            }
             logger.info("completed iteration({})", i);
         }
 
+        logger.debug("final solution: {\"mu_{}_{}\": {{}}}", agentId, maxIter, mu[maxIter]);
     }
 
-    private void publishMuHat(Jedis jedis, Gson gson, String mu_hat, int k, int i) {
-        String out = gson.toJson(new Message(i, mu_hat, Message.PayloadType.MU));
-        jedis.publish(Integer.toString(k), out);
+    private void clearOldMu(int i) {
+        synchronized (mu[i - 1]) {
+            mu[i - 1].setLength(0);
+        }
+        System.gc();
     }
 
-    private String computeMuHat(int k, int i) {
+    private void updateMu(int i, String mu_hat) {
+        synchronized (mu[i]) {
+            if (mu[i].length() > 0) {
+                mu[i].append(", ");
+            }
+            mu[i].append(mu_hat);
+        }
+    }
+
+    private String computeMuHat(int i) {
+        String prevMu = null;
+        synchronized (mu[i - 1]) {
+            prevMu = String.format("{%s}", mu[i - 1].toString().trim());
+        }
         String mu_hat = null;
         try {
-            mu_hat = String.format("mu_hat[%s][%s] ", k, i);
-            Thread.sleep(Math.round(Math.random() * 3000)); // sleep between 0 and 3 sec
+            mu_hat = String.format("\"muhat_%s_%s\": %s", agentId, i, prevMu);
+            Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
         } catch(InterruptedException e) {
             e.printStackTrace();
         }
         return mu_hat;
+    }
+
+    private void publishMuHat(Jedis jedis, Gson gson, String mu_hat, int i) {
+        String out = gson.toJson(new Message(i, mu_hat, Message.PayloadType.MU));
+        jedis.publish(Integer.toString(agentId), out);
     }
 
     public void stop() {
@@ -174,17 +222,10 @@ public class DCEAgent {
             final JedisPubSub neighPubSub = new JedisPubSub() {
                 @Override
                 public void onMessage(String channel, String msg) {
-                    logger.trace("channel: {}, message: {}", channel, msg.substring(0, Math.min(msg.length(), 100)));
+                    logger.trace("channel: {}, message: {}", channel, msg.substring(0, Math.min(msg.length(), 1024)));
                     Gson gson = new Gson();
                     Message in = gson.fromJson(msg, Message.class);
-
-                    // update mu_i (or mu_i+1) being mindful
-                    // of concurrent neighbor updates
-                    synchronized (mu_i) {
-                        mu_i.append(in.payload);
-                    }
-
-                    // notify that the neighbor update is done
+                    updateMu(in.i, in.payload); // TODO: in.type
                     muPhaser.arrive();
                 }
             };
