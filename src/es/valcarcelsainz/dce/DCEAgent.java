@@ -74,65 +74,81 @@ public class DCEAgent {
         Gson gson = new Gson(); // TODO: make static since it's thread-safe
         Jedis jedis = new Jedis(redisHost, redisPort);
 
-        for (int i = 0; i < maxIter; i++) {
+        for (int i = 1; i <= maxIter; i++) {
 
             // compute mu_hat of the current iteration i, eqn. (32)(top)
             String mu_hat = computeMuHat(i);
             updateMu(i, mu_hat);
 
             // broadcast my mu_hat to my neighbors
-            publishMuHat(jedis, gson, mu_hat, i);
+            publish(jedis, gson, mu_hat, i, Message.PayloadType.MU);
 
             // compute mu, eqn. (32)(bottom)
             // wait for all neighbors' mu_hat for current iteration i
-            muPhaser.awaitAdvance(i);
+            muPhaser.awaitAdvance(i - 1); // phase is 0-based
 
-            // at this point it's safe to clear mu_i-1
-            clearOldMu(i);
+            // compute sigma_hat of current iteration i, eqn. (33)(top)
+            String sigma_hat = computeSigmaHat(i);
+            updateSigma(i, sigma_hat);
 
-            // compute and publish sigma_hat of current iteration i, eqn. (33)(top)
+            // broadcast my sigma_hat to my neighbors
+            publish(jedis, gson, sigma_hat, i, Message.PayloadType.SIGMA);
 
             // compute sigma, eqn. (33)(bottom)
             // wait for all neighbors' sigma_hat for current iteration i
-            // sigmaPhaser.awaitAdvance(i);
+            sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
 
-            // at this point it's safe to clear sigma_i-1
-            // clearOldSigma(i);
+            // at this point it's safe to clear mu_i-1 and sigma_i-1
+            clearPrev(i);
+            logger.trace("System.gc()");
+            System.gc();
 
             if (logger.isTraceEnabled()) {
-                synchronized (lock[i % 2]) {
-                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, mu[i % 2]);
+                synchronized (lock[currInd(i)]) {
+                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, mu[currInd(i)]);
+                    logger.trace("{\"sigma_{}_{}\": {{}}}", agentId, i, sigma[currInd(i)]);
                 }
             }
+            // TODO: compute and display iteration error
             logger.info("completed iteration({})", i);
         }
 
-        logger.debug("final solution: {\"mu_{}_{}\": {{}}}", agentId, maxIter - 1, mu[(maxIter - 1) % 2]);
+        logger.debug("final solution (mu): {\"mu_{}_{}\": {{}}}", agentId, maxIter, mu[maxIter % 2]);
+        logger.debug("final solution (sigma): {\"sigma_{}_{}\": {{}}}", agentId, maxIter, sigma[maxIter % 2]);
     }
 
-    private void clearOldMu(int i) {
-        // TODO: perhaps simply call update
-        synchronized (lock[(i + 1) % 2]) {
-            mu[(i + 1) % 2] = "";
+    private void clearPrev(int i) {
+        synchronized (lock[prevInd(i)]) {
+            mu[prevInd(i)] = "";
+            sigma[prevInd(i)] = "";
         }
-        System.gc(); // TODO: don't call this on *every* iteration
     }
 
     private void updateMu(int i, String mu_hat) {
-        synchronized (lock[i % 2]) {
-            int len = mu[i % 2].length();
-            mu[i % 2] += ((len > 0) ? ", " : "") + mu_hat;
+        synchronized (lock[currInd(i)]) {
+            int len = mu[currInd(i)].length();
+            mu[currInd(i)] += ((len > 0) ? ", " : "") + mu_hat;
+        }
+    }
+
+    private void updateSigma(int i, String sigma_hat) {
+        synchronized (lock[currInd(i)]) {
+            int len = sigma[currInd(i)].length();
+            sigma[currInd(i)] += ((len > 0) ? ", " : "") + sigma_hat;
         }
     }
 
     private String computeMuHat(int i) {
+        // eqn. (32)(top) shows mu_hat dependence
+        // on mu from previous iteration
         String prevMu = null;
-        synchronized (lock[(i + 1) % 2]) {
-            prevMu = String.format("{%s}", mu[(i + 1) % 2]);
+        synchronized (lock[prevInd(i)]) {
+            prevMu = String.format("{%s}", mu[prevInd(i)]);
         }
         String mu_hat = null;
         try {
-            mu_hat = String.format("\"muhat_%s_%s\": %s", agentId, i, prevMu);
+            mu_hat = String.format("\"muhat_%1$s_%2$s\": {\"mu_%1$s_%3$s\": %4$s}",
+                    agentId, i, i - 1, prevMu);
             Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
         } catch(InterruptedException e) {
             e.printStackTrace();
@@ -140,8 +156,39 @@ public class DCEAgent {
         return mu_hat;
     }
 
-    private void publishMuHat(Jedis jedis, Gson gson, String mu_hat, int i) {
-        String out = gson.toJson(new Message(i, mu_hat, Message.PayloadType.MU));
+    private String computeSigmaHat(int i) {
+        // eqn. (33)(top) shows sigma_hat dependence on current mu
+        // as well as mu and sigma from previous iteration
+        String currMu, prevMu, prevSigma  = null;
+        synchronized (lock[currInd(i)]) {
+            currMu = String.format("{%s}", mu[currInd(i)]);
+        }
+        synchronized (lock[prevInd(i)]) {
+            prevMu = String.format("{%s}", mu[prevInd(i)]);
+            prevSigma = String.format("{%s}", sigma[prevInd(i)]);
+        }
+        String sigma_hat = null;
+        try {
+            sigma_hat = String.format(
+                    "\"sigmahat_%1$s_%2$s\": {\"mu_%1$s_%2$s\": %4$s, \"mu_%1$s_%3$s\": %5$s, \"sigma_%1$s_%3$s\": %6$s}",
+                    agentId, i, i - 1, currMu, prevMu, prevSigma);
+            Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
+        } catch(InterruptedException e) {
+            e.printStackTrace();
+        }
+        return sigma_hat;
+    }
+
+    private int currInd(int i) {
+        return i % 2;
+    }
+
+    private int prevInd(int i) {
+        return (i + 1) % 2;
+    }
+
+    private void publish(Jedis jedis, Gson gson, String mu_hat, int i, Message.PayloadType type) {
+        String out = gson.toJson(new Message(i, mu_hat, type));
         jedis.publish(Integer.toString(agentId), out);
     }
 
@@ -217,8 +264,19 @@ public class DCEAgent {
                     logger.trace("channel: {}, message: {}", channel, msg.substring(0, Math.min(msg.length(), 1024)));
                     Gson gson = new Gson();
                     Message in = gson.fromJson(msg, Message.class);
-                    updateMu(in.i, in.payload); // TODO: in.type
-                    muPhaser.arrive();
+                    switch (in.type) {
+                        case MU:
+                            updateMu(in.i, in.payload);
+                            muPhaser.arrive();
+                            break;
+                        case SIGMA:
+                            updateSigma(in.i, in.payload);
+                            sigmaPhaser.arrive();
+                            break;
+                        default:
+                            assert false;
+                    }
+
                 }
             };
 
@@ -228,6 +286,7 @@ public class DCEAgent {
 
             neighPubSubs.add(neighPubSub);
             muPhaser.register();
+            sigmaPhaser.register();
         }
         return neighPubSubs;
     }
