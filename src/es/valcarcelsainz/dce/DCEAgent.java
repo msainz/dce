@@ -8,7 +8,6 @@ import redis.clients.jedis.JedisPubSub;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +23,7 @@ public class DCEAgent {
 
     private final int agentId; // k
 
-    // TODO: use this instead
+    // TODO: use an immutable map instead
     // http://google-collections.googlecode.com/svn/trunk/javadoc/com/google/common/collect/ImmutableMap.html
     private final Map<Integer, Double> neighWeights;
 
@@ -39,11 +38,17 @@ public class DCEAgent {
     // target to optimize
     private final GlobalSolutionFunction targetFn;
 
-    // mu at each iteration (although we clear unnecessary history as we go)
-    private StringBuilder[] mu;
+    // mu_i and mu_i+1
+    private String[] mu = new String[] {"", ""}; // TODO: soon will be an array of double[]
 
-    // sigma at each iteration (although we clear unnecessary history as we go)
-    private StringBuilder[] sigma;
+    // sigma_i and sigma_i+1
+    private String[] sigma = new String[] {"", ""}; // TODO: soon will be an array of double[][]
+
+    // synchronization locks for mu/sigma_i and mu/sigma_i+1
+    private Object[] lock = new Object[] {
+            new Object(),
+            new Object()
+    };
 
     public DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
                     String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
@@ -54,18 +59,6 @@ public class DCEAgent {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
-
-        mu = new StringBuilder[maxIter + 1];
-        sigma = new StringBuilder[maxIter + 1];
-        for (int i = 0; i <= maxIter; i++) {
-            // init with the smallest-size element
-            mu[i] = new StringBuilder();
-            sigma[i] = new StringBuilder();
-        }
-
-        // init mu and sigma
-        mu[0].append("");
-        sigma[0].append("");
 
         subscribeToBroadcast();
         subscribeToNeighbors();
@@ -81,7 +74,7 @@ public class DCEAgent {
         Gson gson = new Gson(); // TODO: make static since it's thread-safe
         Jedis jedis = new Jedis(redisHost, redisPort);
 
-        for (int i = 1; i <= maxIter; i++) {
+        for (int i = 0; i < maxIter; i++) {
 
             // compute mu_hat of the current iteration i, eqn. (32)(top)
             String mu_hat = computeMuHat(i);
@@ -92,7 +85,7 @@ public class DCEAgent {
 
             // compute mu, eqn. (32)(bottom)
             // wait for all neighbors' mu_hat for current iteration i
-            muPhaser.awaitAdvance(i-1); // phase starts at 0
+            muPhaser.awaitAdvance(i);
 
             // at this point it's safe to clear mu_i-1
             clearOldMu(i);
@@ -107,36 +100,35 @@ public class DCEAgent {
             // clearOldSigma(i);
 
             if (logger.isTraceEnabled()) {
-                synchronized (mu[i]) {
-                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, mu[i]);
+                synchronized (lock[i % 2]) {
+                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, mu[i % 2]);
                 }
             }
             logger.info("completed iteration({})", i);
         }
 
-        logger.debug("final solution: {\"mu_{}_{}\": {{}}}", agentId, maxIter, mu[maxIter]);
+        logger.debug("final solution: {\"mu_{}_{}\": {{}}}", agentId, maxIter - 1, mu[(maxIter - 1) % 2]);
     }
 
     private void clearOldMu(int i) {
-        synchronized (mu[i - 1]) {
-            mu[i - 1].setLength(0);
+        // TODO: perhaps simply call update
+        synchronized (lock[(i + 1) % 2]) {
+            mu[(i + 1) % 2] = "";
         }
-        System.gc();
+        System.gc(); // TODO: don't call this on *every* iteration
     }
 
     private void updateMu(int i, String mu_hat) {
-        synchronized (mu[i]) {
-            if (mu[i].length() > 0) {
-                mu[i].append(", ");
-            }
-            mu[i].append(mu_hat);
+        synchronized (lock[i % 2]) {
+            int len = mu[i % 2].length();
+            mu[i % 2] += ((len > 0) ? ", " : "") + mu_hat;
         }
     }
 
     private String computeMuHat(int i) {
         String prevMu = null;
-        synchronized (mu[i - 1]) {
-            prevMu = String.format("{%s}", mu[i - 1].toString().trim());
+        synchronized (lock[(i + 1) % 2]) {
+            prevMu = String.format("{%s}", mu[(i + 1) % 2]);
         }
         String mu_hat = null;
         try {
@@ -153,8 +145,8 @@ public class DCEAgent {
         jedis.publish(Integer.toString(agentId), out);
     }
 
-    public void stop() {
-        logger.info("stop called!");
+    public void quit() {
+        logger.info("quit called!");
     }
 
     class Subscriber implements Runnable {
