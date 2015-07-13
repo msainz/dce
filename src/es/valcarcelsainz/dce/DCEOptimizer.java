@@ -43,7 +43,12 @@ public class DCEOptimizer {
                 .nargs("?")
                 .type(Integer.class)
                 .setDefault(0)
-                .help("ignore agents prior to this offset in the weights file");
+                .help("ignore agents prior to this offset in weights-file");
+        parser.addArgument("-n", "--num-agents")
+                .nargs("?")
+                .type(Integer.class)
+                .setDefault(0)
+                .help("number of agents to create, starting at agent-offset (0: through the end of weights-file)");
         parser.addArgument("-i", "--max-iterations")
                 .nargs("?")
                 .type(Integer.class)
@@ -112,10 +117,13 @@ public class DCEOptimizer {
             throws IOException {
         Logger logger = LoggerFactory.getLogger(DCEOptimizer.class);
         String weights_path = parsedArgs.getString("weights_file");
-        int agentOffset = parsedArgs.getInt("agent_offset");
-        logger.info("Applying agent offset of {}", agentOffset);
         List<CSVRecord> agentWeightRecords = parseHastingWeights(weights_path);
-        int numAgents = agentWeightRecords.size();
+        // TODO: unit-test all of this
+        int totalAgents = agentWeightRecords.size();
+        int agentOffset = Math.min(Math.max(0, parsedArgs.getInt("agent_offset")), totalAgents - 1);
+        int numAgents = Math.max(0, parsedArgs.getInt("num_agents"));
+        numAgents = ((0 < numAgents) ? Math.min(numAgents, totalAgents) : totalAgents) - agentOffset;
+        logger.info("Agent offset: {}, count: {}, total: {}", agentOffset, numAgents, totalAgents);
         final Map<Integer, Map<Integer,Double>> agentToNeighWeightsMap = new HashMap<>();
         int recordNumber = 0;
         for (CSVRecord record : agentWeightRecords) {
@@ -127,7 +135,7 @@ public class DCEOptimizer {
             }
             Map<Integer,Double> neighWeights = new HashMap<>();
             double sumNeighWeights = 0.0; // just to check that neigh weights add to 1
-            for (int neighIndex = 0; neighIndex < numAgents; neighIndex++) {
+            for (int neighIndex = 0; neighIndex < totalAgents; neighIndex++) {
                 double neighWeight = Double.parseDouble(record.get(neighIndex));
                 sumNeighWeights += neighWeight;
                 if (neighWeight > 0.0) {
@@ -138,12 +146,15 @@ public class DCEOptimizer {
             assert Math.abs(sumNeighWeights - 1.0) < 1e-6;
             logger.trace(neighWeights.toString());
             agentToNeighWeightsMap.put(recordNumber++, neighWeights);
+            if (agentToNeighWeightsMap.size() == numAgents) {
+                break;
+            }
         }
-        assert (numAgents - agentOffset) == agentToNeighWeightsMap.size();
+        assert numAgents == agentToNeighWeightsMap.size();
         if (logger.isTraceEnabled()) {
             Integer[] agentIds = agentToNeighWeightsMap.keySet().toArray(new Integer[]{0});
             Arrays.sort(agentIds);
-            logger.trace(Arrays.toString(agentIds));
+            logger.trace("Agent id(s): {}", Arrays.toString(agentIds));
         }
         return agentToNeighWeightsMap;
     }
