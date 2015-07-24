@@ -76,11 +76,11 @@ public class DCEAgent {
 
         for (int i = 1; i <= maxIter; i++) {
 
-            // compute mu_hat of the current iteration i, eqn. (32)(top)
+            // compute mu_hat of current iteration i, eqn. (32)(top)
             String mu_hat = computeMuHat(i);
-            updateMu(i, mu_hat);
+            updateMu(i, agentId, mu_hat);
 
-            // broadcast my mu_hat to my neighbors
+            // broadcast mu_hat to neighbors
             publish(jedis, gson, mu_hat, i, Message.PayloadType.MU);
 
             // compute mu, eqn. (32)(bottom)
@@ -89,9 +89,9 @@ public class DCEAgent {
 
             // compute sigma_hat of current iteration i, eqn. (33)(top)
             String sigma_hat = computeSigmaHat(i);
-            updateSigma(i, sigma_hat);
+            updateSigma(i, agentId, sigma_hat);
 
-            // broadcast my sigma_hat to my neighbors
+            // broadcast sigma_hat to neighbors
             publish(jedis, gson, sigma_hat, i, Message.PayloadType.SIGMA);
 
             // compute sigma, eqn. (33)(bottom)
@@ -124,23 +124,39 @@ public class DCEAgent {
         }
     }
 
-    private void updateMu(int i, String mu_hat) {
+//    private void concurrentWeightedIncrement(Object lock, String mutableTarget, String increment, double weight) {
+//        synchronized (lock) {
+//            int len = mutableTarget.length();
+//            mutableTarget += (len > 0 ? ", " : "") +
+//                String.format("\"%.2f_%s", weight, increment.substring(1));
+//        }
+//    }
+
+    private void updateMu(int i, int fromAgentId, String mu_hat) {
         synchronized (lock[currInd(i)]) {
             int len = mu[currInd(i)].length();
-            mu[currInd(i)] += ((len > 0) ? ", " : "") + mu_hat;
+            mu[currInd(i)] += (len > 0 ? ", " : "");
+            mu[currInd(i)] += String.format("\"%.2f_%s",
+                    neighWeights.get(fromAgentId),
+                    mu_hat.substring(1)
+            );
         }
     }
 
-    private void updateSigma(int i, String sigma_hat) {
+    private void updateSigma(int i, int fromAgentId, String sigma_hat) {
         synchronized (lock[currInd(i)]) {
             int len = sigma[currInd(i)].length();
-            sigma[currInd(i)] += ((len > 0) ? ", " : "") + sigma_hat;
+            sigma[currInd(i)] += (len > 0 ? ", " : "");
+            sigma[currInd(i)] += String.format("\"%.2f_%s",
+                    neighWeights.get(fromAgentId),
+                    sigma_hat.substring(1)
+            );
         }
     }
 
     private String computeMuHat(int i) {
-        // eqn. (32)(top) shows mu_hat dependence
-        // on mu from previous iteration
+        // mu_hat depends on mu from previous iteration
+        // see eqn. (32)(top)
         String prevMu = null;
         synchronized (lock[prevInd(i)]) {
             prevMu = String.format("{%s}", mu[prevInd(i)]);
@@ -157,8 +173,9 @@ public class DCEAgent {
     }
 
     private String computeSigmaHat(int i) {
-        // eqn. (33)(top) shows sigma_hat dependence on current mu
-        // as well as mu and sigma from previous iteration
+        // sigma_hat depends on current mu and
+        // mu and sigma from previous iteration
+        // see eqn. (33)(top)
         String currMu, prevMu, prevSigma  = null;
         synchronized (lock[currInd(i)]) {
             currMu = String.format("{%s}", mu[currInd(i)]);
@@ -188,7 +205,7 @@ public class DCEAgent {
     }
 
     private void publish(Jedis jedis, Gson gson, String mu_hat, int i, Message.PayloadType type) {
-        String out = gson.toJson(new Message(i, mu_hat, type));
+        String out = gson.toJson(new Message(i, agentId, mu_hat, type));
         jedis.publish(Integer.toString(agentId), out);
     }
 
@@ -237,13 +254,15 @@ public class DCEAgent {
     }
 
     static class Message {
-        enum PayloadType { MU, SIGMA;};
-        Message(int i, String payload, PayloadType type) {
+        enum PayloadType { MU, SIGMA }
+        Message(int i, int fromAgentId, String payload, PayloadType type) {
             this.i = i;
+            this.fromAgentId = fromAgentId;
             this.payload = payload;
             this.type = type;
         }
         int i;
+        int fromAgentId;
         String payload;
         PayloadType type;
     }
@@ -266,11 +285,11 @@ public class DCEAgent {
                     Message in = gson.fromJson(msg, Message.class);
                     switch (in.type) {
                         case MU:
-                            updateMu(in.i, in.payload);
+                            updateMu(in.i, in.fromAgentId, in.payload);
                             muPhaser.arrive();
                             break;
                         case SIGMA:
-                            updateSigma(in.i, in.payload);
+                            updateSigma(in.i, in.fromAgentId, in.payload);
                             sigmaPhaser.arrive();
                             break;
                         default:
