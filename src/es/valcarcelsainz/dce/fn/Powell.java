@@ -1,9 +1,8 @@
-package es.valcarcelsainz.dce;
+package es.valcarcelsainz.dce.fn;
 
 import java.util.Arrays;
 
 import static smile.math.Math.pow;
-import static smile.math.Math.sin;
 
 /**
  * Implementation of M-dimensional Powell function as per

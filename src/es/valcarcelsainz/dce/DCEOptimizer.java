@@ -1,5 +1,6 @@
 package es.valcarcelsainz.dce;
 
+import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.*;
 import org.apache.commons.csv.CSVFormat;
@@ -109,7 +110,7 @@ public class DCEOptimizer {
     public static GlobalSolutionFunction getTargetFn(Namespace parsedArgs) throws InstantiationException,
             IllegalAccessException, ClassNotFoundException {
         String targetFnClassName = String.format("%s.%s",
-                DCEOptimizer.class.getPackage().getName(),
+                GlobalSolutionFunction.class.getPackage().getName(),
                 parsedArgs.getList("target_function").get(0));
         final GlobalSolutionFunction targetFn =
                 (GlobalSolutionFunction) ClassUtils.getClass(targetFnClassName).newInstance();

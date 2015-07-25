@@ -1,4 +1,4 @@
-package es.valcarcelsainz.dce;
+package es.valcarcelsainz.dce.fn;
 
 import static smile.math.Math.*;
 import java.util.Arrays;

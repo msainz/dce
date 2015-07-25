@@ -1,4 +1,4 @@
-package es.valcarcelsainz.dce;
+package es.valcarcelsainz.dce.fn;
 
 import java.util.Arrays;
 

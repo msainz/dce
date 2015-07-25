@@ -1,5 +1,6 @@
 package es.valcarcelsainz.dce;
 
+import es.valcarcelsainz.dce.fn.*;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import smile.math.*;
@@ -10,7 +11,7 @@ import java.util.Arrays;
 
 /**
  * Cross-Entropy Optimization algorithm to minimize a black-box cost function.
- *
+ * mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.CrossEntropyOptimization"
  */
 public final class CrossEntropyOptimization {
 
