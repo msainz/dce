@@ -31,6 +31,7 @@ public class DCEAgent {
     private final int maxIter;
     private final String redisHost;
     private final int redisPort;
+    private final ParametersService ps;
 
     // pace multi-threaded computation
     private final Phaser muPhaser = new Phaser();
@@ -38,18 +39,6 @@ public class DCEAgent {
 
     // target to optimize
     private final GlobalSolutionFunction targetFn;
-
-    // mu_i and mu_i+1
-    private String[] mu = new String[] {"", ""}; // TODO: soon will be an array of double[]
-
-    // sigma_i and sigma_i+1
-    private String[] sigma = new String[] {"", ""}; // TODO: soon will be an array of double[][]
-
-    // synchronization locks for mu/sigma_i and mu/sigma_i+1
-    private Object[] lock = new Object[] {
-            new Object(),
-            new Object()
-    };
 
     public DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
                     String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
@@ -60,6 +49,7 @@ public class DCEAgent {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
+        this.ps = new ParametersService(agentId);
 
         subscribeToBroadcast();
         subscribeToNeighbors();
@@ -77,9 +67,12 @@ public class DCEAgent {
 
         for (int i = 1; i <= maxIter; i++) {
 
+            // weight given to our own estimates
+            double selfWeight = neighWeights.get(agentId);
+
             // compute mu_hat of current iteration i, eqn. (32)(top)
-            String mu_hat = computeMuHat(i);
-            updateMu(i, agentId, mu_hat);
+            String mu_hat = ps.computeMuHat(i);
+            ps.updateMu(i, selfWeight, mu_hat);
 
             // broadcast mu_hat to neighbors
             publish(jedis, gson, mu_hat, i, Message.PayloadType.MU);
@@ -89,8 +82,8 @@ public class DCEAgent {
             muPhaser.awaitAdvance(i - 1); // phase is 0-based
 
             // compute sigma_hat of current iteration i, eqn. (33)(top)
-            String sigma_hat = computeSigmaHat(i);
-            updateSigma(i, agentId, sigma_hat);
+            String sigma_hat = ps.computeSigmaHat(i);
+            ps.updateSigma(i, selfWeight, sigma_hat);
 
             // broadcast sigma_hat to neighbors
             publish(jedis, gson, sigma_hat, i, Message.PayloadType.SIGMA);
@@ -100,109 +93,22 @@ public class DCEAgent {
             sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
 
             // at this point it's safe to clear mu_i-1 and sigma_i-1
-            clearPrev(i);
+            ps.clearPrev(i);
             logger.trace("System.gc()");
             System.gc();
 
             if (logger.isTraceEnabled()) {
-                synchronized (lock[currInd(i)]) {
-                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, mu[currInd(i)]);
-                    logger.trace("{\"sigma_{}_{}\": {{}}}", agentId, i, sigma[currInd(i)]);
+                synchronized (ps.getLock()[ps.currInd(i)]) {
+                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, ps.getMu()[ps.currInd(i)]);
+                    logger.trace("{\"sigma_{}_{}\": {{}}}", agentId, i, ps.getSigma()[ps.currInd(i)]);
                 }
             }
             // TODO: compute and display iteration error
             logger.info("completed iteration({})", i);
         }
 
-        logger.debug("final solution (mu): {\"mu_{}_{}\": {{}}}", agentId, maxIter, mu[maxIter % 2]);
-        logger.debug("final solution (sigma): {\"sigma_{}_{}\": {{}}}", agentId, maxIter, sigma[maxIter % 2]);
-    }
-
-    private void clearPrev(int i) {
-        synchronized (lock[prevInd(i)]) {
-            mu[prevInd(i)] = "";
-            sigma[prevInd(i)] = "";
-        }
-    }
-
-//    private void concurrentWeightedIncrement(Object lock, String mutableTarget, String increment, double weight) {
-//        synchronized (lock) {
-//            int len = mutableTarget.length();
-//            mutableTarget += (len > 0 ? ", " : "") +
-//                String.format("\"%.2f_%s", weight, increment.substring(1));
-//        }
-//    }
-
-    private void updateMu(int i, int fromAgentId, String mu_hat) {
-        synchronized (lock[currInd(i)]) {
-            int len = mu[currInd(i)].length();
-            mu[currInd(i)] += (len > 0 ? ", " : "");
-            mu[currInd(i)] += String.format("\"%.2f_%s",
-                    neighWeights.get(fromAgentId),
-                    mu_hat.substring(1)
-            );
-        }
-    }
-
-    private void updateSigma(int i, int fromAgentId, String sigma_hat) {
-        synchronized (lock[currInd(i)]) {
-            int len = sigma[currInd(i)].length();
-            sigma[currInd(i)] += (len > 0 ? ", " : "");
-            sigma[currInd(i)] += String.format("\"%.2f_%s",
-                    neighWeights.get(fromAgentId),
-                    sigma_hat.substring(1)
-            );
-        }
-    }
-
-    private String computeMuHat(int i) {
-        // mu_hat depends on mu from previous iteration
-        // see eqn. (32)(top)
-        String prevMu = null;
-        synchronized (lock[prevInd(i)]) {
-            prevMu = String.format("{%s}", mu[prevInd(i)]);
-        }
-        String mu_hat = null;
-        try {
-            mu_hat = String.format("\"muhat_%1$s_%2$s\": {\"mu_%1$s_%3$s\": %4$s}",
-                    agentId, i, i - 1, prevMu);
-            Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
-        } catch(InterruptedException e) {
-            e.printStackTrace();
-        }
-        return mu_hat;
-    }
-
-    private String computeSigmaHat(int i) {
-        // sigma_hat depends on current mu and
-        // mu and sigma from previous iteration
-        // see eqn. (33)(top)
-        String currMu, prevMu, prevSigma  = null;
-        synchronized (lock[currInd(i)]) {
-            currMu = String.format("{%s}", mu[currInd(i)]);
-        }
-        synchronized (lock[prevInd(i)]) {
-            prevMu = String.format("{%s}", mu[prevInd(i)]);
-            prevSigma = String.format("{%s}", sigma[prevInd(i)]);
-        }
-        String sigma_hat = null;
-        try {
-            sigma_hat = String.format(
-                    "\"sigmahat_%1$s_%2$s\": {\"mu_%1$s_%2$s\": %4$s, \"mu_%1$s_%3$s\": %5$s, \"sigma_%1$s_%3$s\": %6$s}",
-                    agentId, i, i - 1, currMu, prevMu, prevSigma);
-            Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
-        } catch(InterruptedException e) {
-            e.printStackTrace();
-        }
-        return sigma_hat;
-    }
-
-    private int currInd(int i) {
-        return i % 2;
-    }
-
-    private int prevInd(int i) {
-        return (i + 1) % 2;
+        logger.debug("final solution (mu): {\"mu_{}_{}\": {{}}}", agentId, maxIter, ps.getMu()[maxIter % 2]);
+        logger.debug("final solution (sigma): {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigma()[maxIter % 2]);
     }
 
     private void publish(Jedis jedis, Gson gson, String mu_hat, int i, Message.PayloadType type) {
@@ -284,13 +190,14 @@ public class DCEAgent {
                     logger.trace("channel: {}, message: {}", channel, msg.substring(0, Math.min(msg.length(), 1024)));
                     Gson gson = new Gson();
                     Message in = gson.fromJson(msg, Message.class);
+                    double neighWeight = neighWeights.get(in.fromAgentId);
                     switch (in.type) {
                         case MU:
-                            updateMu(in.i, in.fromAgentId, in.payload);
+                            ps.updateMu(in.i, neighWeight, in.payload);
                             muPhaser.arrive();
                             break;
                         case SIGMA:
-                            updateSigma(in.i, in.fromAgentId, in.payload);
+                            ps.updateSigma(in.i, neighWeight, in.payload);
                             sigmaPhaser.arrive();
                             break;
                         default:
