@@ -29,17 +29,38 @@ public class DCEAgent {
     private final Map<Integer, Double> neighWeights;
 
     private final int maxIter;
+    private final double gammaQuantile = 0.98;
+    private final double epsilon = 1e12;
+
     private final String redisHost;
+
     private final int redisPort;
     private final IParametersService ps;
-
     // pace multi-threaded computation
     private final Phaser muPhaser = new Phaser();
-    private final Phaser sigmaPhaser = new Phaser();
 
+    private final Phaser sigmaPhaser = new Phaser();
     // target to optimize
     private final GlobalSolutionFunction targetFn;
 
+    // public getters/setters
+    public int getAgentId() {
+        return agentId;
+    }
+
+    public double getGammaQuantile() {
+        return gammaQuantile;
+    }
+
+    public double getEpsilon() {
+        return epsilon;
+    }
+
+    public GlobalSolutionFunction getTargetFn() {
+        return targetFn;
+    }
+
+    // constructor
     public DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
                     String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
 
@@ -49,7 +70,8 @@ public class DCEAgent {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
-        this.ps = new MockParametersServiceImpl(agentId);
+        this.ps = new ParametersServiceImpl(this);
+        // this.ps = new MockParametersServiceImpl(this);
 
         subscribeToBroadcast();
         subscribeToNeighbors();

@@ -2,8 +2,8 @@ package es.valcarcelsainz.dce;
 
 public class MockParametersServiceImpl implements IParametersService {
 
-    // id of client agent using this parameters service
-    private final int clientDCEAgentId;
+    // agent who we are serving
+    private final DCEAgent clientAgent;
 
     // mu_i and mu_i+1
     private StringBuilder[] mu = new StringBuilder[2]; // mutable, non-synchronized
@@ -17,8 +17,8 @@ public class MockParametersServiceImpl implements IParametersService {
             new Object()
     };
 
-    protected MockParametersServiceImpl(int clientDCEAgentId) {
-        this.clientDCEAgentId = clientDCEAgentId;
+    protected MockParametersServiceImpl(DCEAgent clientAgent) {
+        this.clientAgent = clientAgent;
     }
 
     @Override
@@ -96,7 +96,7 @@ public class MockParametersServiceImpl implements IParametersService {
         String mu_hat = null;
         try {
             mu_hat = String.format("\"muhat_%1$s_%2$s\": {\"mu_%1$s_%3$s\": %4$s}",
-                    clientDCEAgentId, i, i - 1, prevMu);
+                    clientAgent.getAgentId(), i, i - 1, prevMu);
             Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
         } catch(InterruptedException e) {
             e.printStackTrace();
@@ -121,7 +121,7 @@ public class MockParametersServiceImpl implements IParametersService {
         try {
             sigma_hat = String.format(
                     "\"sigmahat_%1$s_%2$s\": {\"mu_%1$s_%2$s\": %4$s, \"mu_%1$s_%3$s\": %5$s, \"sigma_%1$s_%3$s\": %6$s}",
-                    clientDCEAgentId, i, i - 1, currMu, prevMu, prevSigma);
+                    clientAgent.getAgentId(), i, i - 1, currMu, prevMu, prevSigma);
             Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
         } catch(InterruptedException e) {
             e.printStackTrace();

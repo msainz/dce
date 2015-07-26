@@ -26,15 +26,15 @@ public final class CrossEntropyOptimization {
         this.epsilon = epsilon;
     }
 
-    private static double smoothIndicator(double y, double gamma, double epsilon) {
+    public static double smoothIndicator(double y, double gamma, double epsilon) {
         return 1. / (1. + exp(-epsilon * (y - gamma)));
     }
 
-    private static int computeNumSamplesForIteration(int iteration) {
+    public static int computeNumSamplesForIteration(int iteration) {
         return (int) max(500., pow(iteration, 1.01));
     }
 
-    private static double computeSmoothingForIteration(int iteration) {
+    public static double computeSmoothingForIteration(int iteration) {
         return 2. / pow(iteration + 100., 0.501);
     }
 
@@ -42,7 +42,7 @@ public final class CrossEntropyOptimization {
      * A = a * A
      * Scale each element of a matrix by a constant.
      */
-    private static double [][] scaleA(double a, double [][] A) {
+    public static double [][] scaleA(double a, double [][] A) {
         for(int i = 0; i < A.length; i++) {
             for(int j = 0; j < A[0].length; j++) {
                 A[i][j] *= a;
@@ -51,11 +51,31 @@ public final class CrossEntropyOptimization {
         return A;
     }
 
-    public void init(double [] mu, double [][] sigma, final long seed) {
+    public static void unifRandInit(double[] mu, double[][] sigma, final long seed) {
         new Random(seed).nextDoubles(mu, -100d, 100d);
         for (int i = 0; i < mu.length; i++) {
             sigma[i][i] = 1000;
         }
+    }
+
+    // sample from latest surrogate belief distribution f, evaluate function J
+    // at the samples, and compute new elite threshold gamma
+    public static double sample(MultivariateGaussianDistribution f,
+                           MultivariateFunction J,
+                           double [][] xs, double [] ys,
+                           double gammaQuantile) {
+        int numSamples = xs.length;
+        int M = xs[0].length;
+        IQAgent gammaFinder = new IQAgent(M);
+        for(int xsInd=0; xsInd < numSamples; xsInd++) {
+            double [] x = f.rand();
+            double y = J.f(x);
+            xs[xsInd] = x;
+            ys[xsInd] = y;
+            gammaFinder.add(y);
+        }
+        double gamma = gammaFinder.quantile(gammaQuantile);
+        return gamma;
     }
 
     public void maximize(MultivariateFunction J, double [] mu, double [][] sigma, int maxIter) {
@@ -71,20 +91,9 @@ public final class CrossEntropyOptimization {
             MultivariateGaussianDistribution f =
                     new MultivariateGaussianDistribution(mu, sigma);
 
-            // sample from latest surrogate belief distribution f
-            // and compute new elite threshold gamma
             double [][] xs = new double[numSamples][M];
             double [] ys = new double[xs.length];
-            IQAgent gammaFinder = new IQAgent(M);
-            for(int xsInd=0; xsInd < numSamples; xsInd++) {
-                double [] x = f.rand();
-                double y = J.f(x);
-                xs[xsInd] = x;
-                ys[xsInd] = y;
-                gammaFinder.add(y);
-            }
-
-            double gamma = gammaFinder.quantile(gammaQuantile);
+            double gamma = sample(f, J, xs, ys, gammaQuantile);
 
             // Arrays.sort(ys);
             // LOG.debug("gamma: " + gamma + " | ys: " + Arrays.toString(ys));
@@ -154,7 +163,7 @@ public final class CrossEntropyOptimization {
             int M = J.getDim();
             mu = new double[M];
             sigma = new double[M][M];
-            SACE.init(mu, sigma, System.currentTimeMillis());
+            unifRandInit(mu, sigma, System.currentTimeMillis());
             SACE.maximize(J, mu, sigma, maxIter);
             logSolnAndPause(J);
         }
