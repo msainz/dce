@@ -31,7 +31,7 @@ public class DCEAgent {
     private final int maxIter;
     private final String redisHost;
     private final int redisPort;
-    private final ParametersService ps;
+    private final IParametersService ps;
 
     // pace multi-threaded computation
     private final Phaser muPhaser = new Phaser();
@@ -49,7 +49,7 @@ public class DCEAgent {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
-        this.ps = new ParametersService(agentId);
+        this.ps = new MockParametersServiceImpl(agentId);
 
         subscribeToBroadcast();
         subscribeToNeighbors();
@@ -64,6 +64,8 @@ public class DCEAgent {
 
         Gson gson = new Gson(); // TODO: make static since it's thread-safe
         Jedis jedis = new Jedis(redisHost, redisPort);
+
+        ps.initParameters();
 
         for (int i = 1; i <= maxIter; i++) {
 
@@ -93,7 +95,7 @@ public class DCEAgent {
             sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
 
             // at this point it's safe to clear mu_i-1 and sigma_i-1
-            ps.clearPrev(i);
+            ps.clearParameters(ps.prevInd(i));
             logger.trace("System.gc()");
             System.gc();
 
@@ -174,6 +176,7 @@ public class DCEAgent {
         PayloadType type;
     }
 
+    // TODO: alternatively, subscribe to a MU channel and SIGMA channel for each neighbor
     public List<JedisPubSub> subscribeToNeighbors() {
         final List<JedisPubSub> neighPubSubs = new LinkedList<>();
         for (Map.Entry<Integer,Double> neighWeight : neighWeights.entrySet()) {

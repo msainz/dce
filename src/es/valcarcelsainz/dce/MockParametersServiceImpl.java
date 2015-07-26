@@ -1,15 +1,15 @@
 package es.valcarcelsainz.dce;
 
-public class ParametersService {
+public class MockParametersServiceImpl implements IParametersService {
 
     // id of client agent using this parameters service
     private final int clientDCEAgentId;
 
     // mu_i and mu_i+1
-    private String[] mu = new String[] {"", ""}; // TODO: soon will be an array of double[]
+    private StringBuilder[] mu = new StringBuilder[2]; // mutable, non-synchronized
 
     // sigma_i and sigma_i+1
-    private String[] sigma = new String[] {"", ""}; // TODO: soon will be an array of double[][]
+    private StringBuilder[] sigma = new StringBuilder[2]; // mutable, non-synchronized
 
     // synchronization locks for mu/sigma_i and mu/sigma_i+1
     private Object[] lock = new Object[] {
@@ -17,30 +17,44 @@ public class ParametersService {
             new Object()
     };
 
-    protected ParametersService(int clientDCEAgentId) {
+    protected MockParametersServiceImpl(int clientDCEAgentId) {
         this.clientDCEAgentId = clientDCEAgentId;
     }
 
-    protected String[] getMu() {
+    @Override
+    public StringBuilder[] getMu() {
         return mu;
     }
 
-    protected String[] getSigma() {
+    @Override
+    public StringBuilder[] getSigma() {
         return sigma;
     }
 
-    protected Object[] getLock() {
+    @Override
+    public Object[] getLock() {
         return lock;
     }
 
-    protected void clearPrev(int i) {
-        synchronized (lock[prevInd(i)]) {
-            mu[prevInd(i)] = "";
-            sigma[prevInd(i)] = "";
+    @Override
+    public void initParameters() {
+        for (int j = 0; j < 2; j++) {
+            synchronized (lock[j]) {
+                mu[j] = new StringBuilder();
+                sigma[j] = new StringBuilder();
+            }
         }
     }
 
-//    private void concurrentWeightedIncrement(Object lock, String mutableTarget, String increment, double weight) {
+    @Override
+    public void clearParameters(int i) {
+        synchronized (lock[i]) {
+            mu[i].setLength(0);
+            sigma[i].setLength(0);
+        }
+    }
+
+//    private void concurrentWeightedIncrement(Object lock, StringBuilder mutableTarget, String increment, double weight) {
 //        synchronized (lock) {
 //            int len = mutableTarget.length();
 //            mutableTarget += (len > 0 ? ", " : "") +
@@ -48,28 +62,31 @@ public class ParametersService {
 //        }
 //    }
 
-    protected void updateMu(int i, double weight, String mu_hat) {
+    @Override
+    public void updateMu(int i, double weight, String mu_hat) {
         synchronized (lock[currInd(i)]) {
             int len = mu[currInd(i)].length();
-            mu[currInd(i)] += (len > 0 ? ", " : "");
-            mu[currInd(i)] += String.format("\"%.2f_%s",
+            mu[currInd(i)].append(len > 0 ? ", " : "");
+            mu[currInd(i)].append(String.format("\"%.2f_%s",
                     weight, mu_hat.substring(1)
-            );
+            ));
         }
     }
 
-    protected void updateSigma(int i, double weight, String sigma_hat) {
+    @Override
+    public void updateSigma(int i, double weight, String sigma_hat) {
         synchronized (lock[currInd(i)]) {
             int len = sigma[currInd(i)].length();
-            sigma[currInd(i)] += (len > 0 ? ", " : "");
-            sigma[currInd(i)] += String.format("\"%.2f_%s",
+            sigma[currInd(i)].append(len > 0 ? ", " : "");
+            sigma[currInd(i)].append(String.format("\"%.2f_%s",
                     weight,
                     sigma_hat.substring(1)
-            );
+            ));
         }
     }
 
-    protected String computeMuHat(int i) {
+    @Override
+    public String computeMuHat(int i) {
         // mu_hat depends on mu from previous iteration
         // see eqn. (32)(top)
         String prevMu = null;
@@ -87,7 +104,8 @@ public class ParametersService {
         return mu_hat;
     }
 
-    protected String computeSigmaHat(int i) {
+    @Override
+    public String computeSigmaHat(int i) {
         // sigma_hat depends on current mu and
         // mu and sigma from previous iteration
         // see eqn. (33)(top)
@@ -111,11 +129,13 @@ public class ParametersService {
         return sigma_hat;
     }
 
-    protected int currInd(int i) {
+    @Override
+    public int currInd(int i) {
         return i % 2;
     }
 
-    protected int prevInd(int i) {
+    @Override
+    public int prevInd(int i) {
         return (i + 1) % 2;
     }
 }
