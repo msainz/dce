@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
+import smile.math.Math;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -43,6 +44,9 @@ public class DCEAgent {
     // target to optimize
     private final GlobalSolutionFunction targetFn;
 
+    // thread-safe, so we make static to share among agents
+    public static final Gson GSON = new Gson();
+
     // public getters/setters
     public int getAgentId() {
         return agentId;
@@ -71,7 +75,7 @@ public class DCEAgent {
         this.redisPort = redisPort;
         this.targetFn = targetFn;
         this.ps = new ParametersServiceImpl(this);
-        // this.ps = new MockParametersServiceImpl(this);
+//        this.ps = new MockParametersServiceImpl(this);
 
         subscribeToBroadcast();
         subscribeToNeighbors();
@@ -83,60 +87,85 @@ public class DCEAgent {
     public void start() {
         logger.info("agent({}) started", agentId);
         logger.info("connecting to redis at {}:{}", redisHost, redisPort);
-
-        Gson gson = new Gson(); // TODO: make static since it's thread-safe
         Jedis jedis = new Jedis(redisHost, redisPort);
 
         ps.initParameters();
+        ps.clearParameters(1);
 
         for (int i = 1; i <= maxIter; i++) {
 
             // weight given to our own estimates
             double selfWeight = neighWeights.get(agentId);
 
+            int M = targetFn.getDim();
+            int numSamples = CrossEntropyOptimization.computeNumSamplesForIteration(i);
+            double alpha = CrossEntropyOptimization.computeSmoothingForIteration(i);
+
+            // array of samples and array of target function evaluations
+            double [][] xs = new double[numSamples][M];
+            double [] ys = new double[xs.length];
+
+            // sample from surrogate and evaluate target at the samples
+            Object[] fAndGamma = ps.sampleNewGaussian(i, xs, ys, targetFn);
+            MultivariateGaussianDistribution f = (MultivariateGaussianDistribution) fAndGamma[0];
+            double gamma = (double) fAndGamma[1];
+
+            logTraceParameters(i, "before-computeMuHat");
+            logger.trace("i: {} | alpha: {} | gamma: {}", i, alpha, gamma);
+
+            // ugly optimization, but since we don't need to draw any more
+            // samples from f, we'll reuse it's internal register as buffer
+            // instead of making another deep copy of mu (and sigma)
+            double [] mu_hat = f.mu; // effectively, mus[prevInd(i)]
+
             // compute mu_hat of current iteration i, eqn. (32)(top)
-            String mu_hat = ps.computeMuHat(i);
+            ps.computeMuHat(i, mu_hat, xs, ys, alpha, gamma, epsilon);
             ps.updateMu(i, selfWeight, mu_hat);
 
             // broadcast mu_hat to neighbors
-            publish(jedis, gson, mu_hat, i, Message.PayloadType.MU);
+            publish(jedis, GSON.toJson(mu_hat), i, Message.PayloadType.MU);
 
             // compute mu, eqn. (32)(bottom)
             // wait for all neighbors' mu_hat for current iteration i
             muPhaser.awaitAdvance(i - 1); // phase is 0-based
 
+            logTraceParameters(i, "before-computeSigmaHat");
+
             // compute sigma_hat of current iteration i, eqn. (33)(top)
-            String sigma_hat = ps.computeSigmaHat(i);
+            double [][] sigma_hat = f.sigma; // same ugly optimization
+            ps.computeSigmaHat(i, sigma_hat, xs, ys, alpha, gamma, epsilon);
             ps.updateSigma(i, selfWeight, sigma_hat);
 
+            // at this point it's safe to clear mu_i-1 and sigma_i-1
+            ps.clearParameters(ps.prevInd(i));
+
             // broadcast sigma_hat to neighbors
-            publish(jedis, gson, sigma_hat, i, Message.PayloadType.SIGMA);
+            publish(jedis, GSON.toJson(sigma_hat), i, Message.PayloadType.SIGMA);
 
             // compute sigma, eqn. (33)(bottom)
             // wait for all neighbors' sigma_hat for current iteration i
             sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
 
-            // at this point it's safe to clear mu_i-1 and sigma_i-1
-            ps.clearParameters(ps.prevInd(i));
-            logger.trace("System.gc()");
-            System.gc();
-
-            if (logger.isTraceEnabled()) {
-                synchronized (ps.getLock()[ps.currInd(i)]) {
-                    logger.trace("{\"mu_{}_{}\": {{}}}", agentId, i, ps.getMu()[ps.currInd(i)]);
-                    logger.trace("{\"sigma_{}_{}\": {{}}}", agentId, i, ps.getSigma()[ps.currInd(i)]);
-                }
+            synchronized (ps.getLocks()[ps.currInd(i)]) {
+                double rmse = CrossEntropyOptimization.rmse(ps.getMus()[ps.currInd(i)], targetFn.getSoln());
+                logger.info("completed iteration({}), rmse: {}", i, rmse);
             }
-            // TODO: compute and display iteration error
-            logger.info("completed iteration({})", i);
         }
-
-        logger.debug("final solution (mu): {\"mu_{}_{}\": {{}}}", agentId, maxIter, ps.getMu()[maxIter % 2]);
-        logger.debug("final solution (sigma): {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigma()[maxIter % 2]);
+        logger.info("final sigma: {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigmas()[maxIter % 2]);
+        logger.info("final mu: {\"mu_{}_{}\": {{}}}", agentId, maxIter, ps.getMus()[maxIter % 2]);
     }
 
-    private void publish(Jedis jedis, Gson gson, String mu_hat, int i, Message.PayloadType type) {
-        String out = gson.toJson(new Message(i, agentId, mu_hat, type));
+    private void logTraceParameters(int i, String msg) {
+        if (logger.isTraceEnabled()) {
+            synchronized (ps.getLocks()[ps.currInd(i)]) {
+                logger.trace("{} {\"mu_{}_{}\": {{}}}", msg, agentId, i, ps.getMus()[ps.currInd(i)]);
+                logger.trace("{} {\"sigma_{}_{}\": {{}}}", msg, agentId, i, ps.getSigmas()[ps.currInd(i)]);
+            }
+        }
+    }
+
+    private void publish(Jedis jedis, String mu_hat, int i, Message.PayloadType type) {
+        String out = GSON.toJson(new Message(i, agentId, mu_hat, type));
         jedis.publish(Integer.toString(agentId), out);
     }
 

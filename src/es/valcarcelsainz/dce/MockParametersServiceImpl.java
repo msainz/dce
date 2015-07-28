@@ -1,6 +1,6 @@
 package es.valcarcelsainz.dce;
 
-public class MockParametersServiceImpl implements IParametersService {
+public class MockParametersServiceImpl {
 
     // agent who we are serving
     private final DCEAgent clientAgent;
@@ -21,22 +21,18 @@ public class MockParametersServiceImpl implements IParametersService {
         this.clientAgent = clientAgent;
     }
 
-    @Override
-    public StringBuilder[] getMu() {
+    public StringBuilder[] getMus() {
         return mu;
     }
 
-    @Override
-    public StringBuilder[] getSigma() {
+    public StringBuilder[] getSigmas() {
         return sigma;
     }
 
-    @Override
-    public Object[] getLock() {
+    public Object[] getLocks() {
         return lock;
     }
 
-    @Override
     public void initParameters() {
         for (int j = 0; j < 2; j++) {
             synchronized (lock[j]) {
@@ -46,7 +42,6 @@ public class MockParametersServiceImpl implements IParametersService {
         }
     }
 
-    @Override
     public void clearParameters(int i) {
         synchronized (lock[i]) {
             mu[i].setLength(0);
@@ -62,7 +57,6 @@ public class MockParametersServiceImpl implements IParametersService {
 //        }
 //    }
 
-    @Override
     public void updateMu(int i, double weight, String mu_hat) {
         synchronized (lock[currInd(i)]) {
             int len = mu[currInd(i)].length();
@@ -73,7 +67,6 @@ public class MockParametersServiceImpl implements IParametersService {
         }
     }
 
-    @Override
     public void updateSigma(int i, double weight, String sigma_hat) {
         synchronized (lock[currInd(i)]) {
             int len = sigma[currInd(i)].length();
@@ -85,7 +78,6 @@ public class MockParametersServiceImpl implements IParametersService {
         }
     }
 
-    @Override
     public String computeMuHat(int i) {
         // mu_hat depends on mu from previous iteration
         // see eqn. (32)(top)
@@ -104,7 +96,6 @@ public class MockParametersServiceImpl implements IParametersService {
         return mu_hat;
     }
 
-    @Override
     public String computeSigmaHat(int i) {
         // sigma_hat depends on current mu and
         // mu and sigma from previous iteration
@@ -129,12 +120,10 @@ public class MockParametersServiceImpl implements IParametersService {
         return sigma_hat;
     }
 
-    @Override
     public int currInd(int i) {
         return i % 2;
     }
 
-    @Override
     public int prevInd(int i) {
         return (i + 1) % 2;
     }

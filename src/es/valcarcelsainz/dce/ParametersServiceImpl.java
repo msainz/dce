@@ -1,10 +1,14 @@
 package es.valcarcelsainz.dce;
 
-import smile.stat.distribution.MultivariateGaussianDistribution;
+import com.google.gson.reflect.TypeToken;
+import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
+import smile.math.Random;
 
+import java.lang.reflect.Type;
 import java.util.Arrays;
 
-import static smile.math.Math.copy;
+import static smile.math.Math.plus;
+import static smile.math.Math.scale;
 
 public class ParametersServiceImpl implements IParametersService {
 
@@ -12,13 +16,13 @@ public class ParametersServiceImpl implements IParametersService {
     private final DCEAgent clientAgent;
 
     // mu_i and mu_i+1
-    private double[] mu[] = new double[2][];
+    private double[] mus[] = new double[2][];
 
     // sigma_i and sigma_i+1
-    private double[][] sigma[] = new double[2][][];
+    private double[][] sigmas[] = new double[2][][];
 
     // synchronization locks for mu/sigma_i and mu/sigma_i+1
-    private Object[] lock = new Object[] {
+    private Object[] locks = new Object[] {
             new Object(),
             new Object()
     };
@@ -28,102 +32,135 @@ public class ParametersServiceImpl implements IParametersService {
     }
 
     @Override
-    public double[][] getMu() {
-        return mu;
+    public double[][] getMus() {
+        return mus;
     }
 
     @Override
-    public double[][][] getSigma() {
-        return sigma;
+    public double[][][] getSigmas() {
+        return sigmas;
     }
 
     @Override
-    public Object[] getLock() {
-        return lock;
+    public Object[] getLocks() {
+        return locks;
     }
 
     @Override
     public void initParameters() {
         for (int j = 0; j < 2; j++) {
-            synchronized (lock[j]) {
+            synchronized (locks[j]) {
                 int M = M();
-                mu[j] = new double[M];
-                sigma[j] = new double[M][M];
-                CrossEntropyOptimization.unifRandInit(
-                        mu[j], sigma[j], System.currentTimeMillis()
+                mus[j] = new double[M];
+                sigmas[j] = new double[M][M];
+                CrossEntropyOptimization.init(mus[j], sigmas[j],
+                        System.currentTimeMillis() + Thread.currentThread().getId()
                 );
+
+//                mus[j][0] = 66.3948655128479;
+//                mus[j][1] = -8.485877513885498;
+//                mus[j][2] = 86.19184494018555;
+//                mus[j][3] = 0.46983957290649414;
             }
         }
     }
 
-    private int M() {
+    protected int M() {
         return clientAgent.getTargetFn().getDim();
     }
 
     @Override
     public void clearParameters(int i) {
-        synchronized (lock[i]) {
-            Arrays.fill(mu[i], 0);
+        synchronized (locks[i]) {
+            Arrays.fill(mus[i], 0);
             for (int j = 0; j < M(); j++) {
-                Arrays.fill(sigma[i][j], 0);
+                Arrays.fill(sigmas[i][j], 0);
+            }
+        }
+    }
+
+    @Override
+    // create new surrogate gaussian with mu and sigma from prev iteration
+    // which won't receive more updates by the time this method is called
+    public Object[] sampleNewGaussian(int i, double[][] xs, double[] ys, GlobalSolutionFunction J) {
+        MultivariateGaussianDistribution f = new MultivariateGaussianDistribution(
+                // this constructor deep-copies mu[i] and sigma[i]
+                // later accessible via f.mean() and f.cov() respectively
+                mus[prevInd(i)], sigmas[prevInd(i)],
+                new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // new Random(i)
+        );
+        double gamma = CrossEntropyOptimization.sample(
+                f, J, xs, ys, clientAgent.getGammaQuantile()
+        );
+        return new Object[] {f, gamma};
+    }
+
+    @Override
+    public void updateMu(int i, double weight, double [] mu_hat) {
+        synchronized (locks[currInd(i)]) {
+            // using a+bc == b(a/b+c) to avoid
+            // allocating a new array
+            double [] mu = mus[currInd(i)];
+            double inverse_weight = 1./weight;
+            for (int j = 0; j < mu.length; j++) {
+                mu[j] *= inverse_weight;
+                mu[j] += mu_hat[j];
+                mu[j] *= weight;
             }
         }
     }
 
     @Override
     public void updateMu(int i, double weight, String mu_hat) {
-        synchronized (lock[currInd(i)]) {
-            // TODO
+        double [] muHat = clientAgent.GSON.fromJson(mu_hat, double[].class);
+        updateMu(i, weight, muHat);
+    }
+
+    @Override
+    public void updateSigma(int i, double weight, double[][] sigma_hat) {
+        synchronized (locks[currInd(i)]) {
+            // using a+bc == b(a/b+c) to avoid
+            // allocating a new array
+            double [][] sigma = sigmas[currInd(i)];
+            double inverse_weight = 1./weight;
+            for(int j = 0; j < sigma.length; j++) {
+                for(int k = 0; k < sigma[0].length; k++) {
+                    sigma[j][k] *= inverse_weight;
+                    sigma[j][k] += sigma_hat[j][k];
+                    sigma[j][k] *= weight;
+                }
+            }
         }
     }
 
     @Override
     public void updateSigma(int i, double weight, String sigma_hat) {
-        synchronized (lock[currInd(i)]) {
-            // TODO
-        }
+        Type sigmaType = new TypeToken<double[][]>() {}.getType();
+        double [][] sigmaHat = clientAgent.GSON.fromJson(sigma_hat, sigmaType);
+        updateSigma(i, weight, sigmaHat);
     }
 
     @Override
-    public String computeMuHat(int i) {
-        // mu_hat depends on mu from previous iteration
+    public void computeMuHat(int i, double[] mu_hat, double [][] xs, double [] ys,
+                             double alpha, double gamma, double epsilon) {
         // see eqn. (32)(top)
-
-        int M = M();
-        int numSamples = CrossEntropyOptimization.computeNumSamplesForIteration(i);
-        double alpha = CrossEntropyOptimization.computeSmoothingForIteration(i);
-
-        // create new surrogate gaussian with latest estimates of mu and sigma
-        MultivariateGaussianDistribution f = null;
-        synchronized (lock[currInd(i)]) {
-            // this constructor deep copies mu[i] and sigma[i]
-            f = new MultivariateGaussianDistribution(mu[currInd(i)], sigma[currInd(i)]);
-        }
-
-        // sample from surrogate and evaluate target at the samples
-        double [][] xs = new double[numSamples][M];
-        double [] ys = new double[xs.length];
-        double gamma = CrossEntropyOptimization.sample(f, clientAgent.getTargetFn(),
-                xs, ys, clientAgent.getGammaQuantile());
-
-        return "";
-
+        CrossEntropyOptimization.updateMu(
+                mu_hat, xs, ys, alpha, gamma, epsilon
+        );
     }
 
     @Override
-    public String computeSigmaHat(int i) {
-        // sigma_hat depends on current mu and
-        // mu and sigma from previous iteration
+    public void computeSigmaHat(int i, double [][] sigma_hat, double [][] xs, double [] ys,
+                                double alpha, double gamma, double epsilon) {
+
+        // neither will receive updates when this method is called
+        double [] mu_prev = mus[prevInd(i)];
+        double [] mu_curr = mus[currInd(i)];
+
         // see eqn. (33)(top)
-        String sigma_hat = "";
-        String currMu, prevMu, prevSigma  = null;
-        synchronized (lock[currInd(i)]) {
-
-        }
-        synchronized (lock[prevInd(i)]) {
-
-        }
-        return sigma_hat;
+        CrossEntropyOptimization.updateSigma(
+                sigma_hat, mu_curr, mu_prev, xs, ys, alpha, gamma, epsilon
+        );
     }
 
     @Override
