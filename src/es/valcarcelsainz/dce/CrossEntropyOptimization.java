@@ -165,8 +165,8 @@ public final class CrossEntropyOptimization {
             double [] ys = new double[xs.length];
             double gamma = sample(f, J, xs, ys, gammaQuantile);
 
-            LOG.trace(String.format("i: %s | alpha: %s | gamma: %s | rmse: %s | J(mu): %s | mu: %s | sigma: %s",
-                    iter, alpha, gamma, rmse(mu, J.getSoln()), J.f(mu), GSON.toJson(mu), GSON.toJson(sigma)));
+            LOG.trace(String.format("i: %s | alpha: %s | gamma: %s | J(mu): %s | mu: %s | sigma: %s",
+                    iter, alpha, gamma, J.f(mu), GSON.toJson(mu), GSON.toJson(sigma)));
 
             // deep copy mu -> mu_prev
             double [] mu_prev = new double[M];
@@ -179,6 +179,7 @@ public final class CrossEntropyOptimization {
             // sigma update -- eqn. (33)
             updateSigma(sigma, mu, mu_prev, xs, ys, alpha, gamma, epsilon);
             LOG.trace(String.format("i: %s | sigma_hat: %s", iter, GSON.toJson(sigma)));
+            LOG.info(String.format("completed iteration(%s), rmse: %s", iter, rmse(mu, J.getSoln())));
         }
 
         LOG.info("final sigma: " + GSON.toJson(sigma));
@@ -199,9 +200,9 @@ public final class CrossEntropyOptimization {
                 new CrossEntropyOptimization(gammaQuantile, epsilon);
 
         GlobalSolutionFunction [] funs = new GlobalSolutionFunction[] {
-            //new Dejong(),
+            new Dejong(),
             //new Shekel(),
-            new Rosenbrock(),
+            //new Rosenbrock(),
             //new Powell(),
             //new Trigonometric(),
             //new Griewank(),
