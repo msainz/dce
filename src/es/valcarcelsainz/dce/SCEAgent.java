@@ -10,19 +10,19 @@ import smile.sort.IQAgent;
 
 /**
  * Cross-Entropy Optimization algorithm to minimize a black-box cost function.
- * mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.CrossEntropyOptimization"
+ * MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.SCEAgent"
  */
-public final class CrossEntropyOptimization {
+public final class SCEAgent {
 
     private static final Logger LOG =
-            LogManager.getLogger(CrossEntropyOptimization.class);
+            LogManager.getLogger(SCEAgent.class);
 
     public static final Gson GSON = new Gson();
 
     private final double gammaQuantile;
     private final double epsilon;
 
-    public CrossEntropyOptimization(double gammaQuantile, double epsilon) {
+    public SCEAgent(double gammaQuantile, double epsilon) {
         this.gammaQuantile = gammaQuantile;
         this.epsilon = epsilon;
     }
@@ -187,7 +187,7 @@ public final class CrossEntropyOptimization {
         LOG.info("final rmse: " + rmse(mu, J.getSoln()));
     }
 
-    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.CrossEntropyOptimization"
+    // MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.SCEAgent"
     public static void main(String [] args) throws InterruptedException {
         final int maxIter = 500;
         final double gammaQuantile = 0.98;
@@ -196,15 +196,15 @@ public final class CrossEntropyOptimization {
         double [] mu;
         double [][] sigma;
 
-        final CrossEntropyOptimization SACE =
-                new CrossEntropyOptimization(gammaQuantile, epsilon);
+        final SCEAgent SACE =
+                new SCEAgent(gammaQuantile, epsilon);
 
         GlobalSolutionFunction [] funs = new GlobalSolutionFunction[] {
-            new Dejong(),
+            //new Dejong(),
             //new Shekel(),
             //new Rosenbrock(),
             //new Powell(),
-            //new Trigonometric(),
+            new Trigonometric(),
             //new Griewank(),
             //new Pinter(),
         };
@@ -214,19 +214,13 @@ public final class CrossEntropyOptimization {
             mu = new double[M];
             sigma = new double[M][M];
             init(mu, sigma, System.currentTimeMillis());
-
-//            mu[0] = 66.3948655128479;
-//            mu[1] = -8.485877513885498;
-//            mu[2] = 86.19184494018555;
-//            mu[3] = 0.46983957290649414;
-
             SACE.maximize(J, mu, sigma, maxIter);
             logSolnAndPause(J);
         }
     }
 
     private static void logSolnAndPause(GlobalSolutionFunction J) throws InterruptedException {
-        Logger LOG = LogManager.getLogger(CrossEntropyOptimization.class);
+        Logger LOG = LogManager.getLogger(SCEAgent.class);
         LOG.debug(J.getName() + " | max: " + J.getMax() + " | solution: " + GSON.toJson(J.getSoln()));
         Thread.sleep(3000);
     }

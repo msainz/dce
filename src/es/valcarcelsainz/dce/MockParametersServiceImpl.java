@@ -88,7 +88,7 @@ public class MockParametersServiceImpl {
         String mu_hat = null;
         try {
             mu_hat = String.format("\"muhat_%1$s_%2$s\": {\"mu_%1$s_%3$s\": %4$s}",
-                    clientAgent.getAgentId(), i, i - 1, prevMu);
+                    -1, i, i - 1, prevMu); // clientAgent.getAgentId()
             Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
         } catch(InterruptedException e) {
             e.printStackTrace();
@@ -112,7 +112,7 @@ public class MockParametersServiceImpl {
         try {
             sigma_hat = String.format(
                     "\"sigmahat_%1$s_%2$s\": {\"mu_%1$s_%2$s\": %4$s, \"mu_%1$s_%3$s\": %5$s, \"sigma_%1$s_%3$s\": %6$s}",
-                    clientAgent.getAgentId(), i, i - 1, currMu, prevMu, prevSigma);
+                    -1, i, i - 1, currMu, prevMu, prevSigma); // clientAgent.getAgentId()
             Thread.sleep(Math.round(Math.random() * 1000)); // sleep up to 1 sec
         } catch(InterruptedException e) {
             e.printStackTrace();
