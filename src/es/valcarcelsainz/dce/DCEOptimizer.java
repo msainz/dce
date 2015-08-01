@@ -8,6 +8,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.FileAppender;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.Level;
 import org.slf4j.Logger;
@@ -24,7 +25,6 @@ import java.util.*;
  * @author Marcos Sainz
  */
 public class DCEOptimizer {
-
     // mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
     // single process with 3 agents:
     //      MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Dejong -i 500 -r localhost -l info" | grep 'mainThread(0)'
@@ -174,11 +174,14 @@ public class DCEOptimizer {
     }
 
     private static void setupLogger(final String level) {
-        org.apache.log4j.Logger.getRootLogger().removeAllAppenders();
-        org.apache.log4j.Logger.getRootLogger().addAppender(new ConsoleAppender(
+        org.apache.log4j.Logger rootLogger = org.apache.log4j.Logger.getRootLogger();
+        rootLogger.removeAllAppenders(); // disregard log4j.properties
+        rootLogger.setLevel(Level.INFO);
+
+        org.apache.log4j.Logger dceLogger = org.apache.log4j.Logger.getLogger("es.valcarcelsainz.dce");
+        dceLogger.setLevel(Level.toLevel(level));
+        dceLogger.addAppender(new ConsoleAppender(
                 new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), ConsoleAppender.SYSTEM_OUT));
-        org.apache.log4j.Logger.getRootLogger().setLevel(Level.INFO);
-        org.apache.log4j.Logger.getLogger("es.valcarcelsainz.dce").setLevel(Level.toLevel(level));
     }
     
 }

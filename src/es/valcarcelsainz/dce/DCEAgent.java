@@ -1,25 +1,35 @@
 package es.valcarcelsainz.dce;
 
+import com.codahale.metrics.*;
 import com.google.gson.Gson;
 import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Level;
+import org.apache.log4j.SimpleLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 import smile.math.Math;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Phaser;
+
+import static com.codahale.metrics.MetricRegistry.name;
 
 /**
  * @author Marcos Sainz
  */
 public class DCEAgent {
 
+    private static final MetricRegistry registry = new MetricRegistry();
     private static final Logger logger =
             LoggerFactory.getLogger(DCEAgent.class);
 
@@ -47,6 +57,9 @@ public class DCEAgent {
     // thread-safe, so we make static to share among agents
     public static final Gson GSON = new Gson();
 
+    // instance field to allow async polling e.g. jmx gauge reporter
+    private double rmse;
+
     // public getters/setters
     public int getAgentId() {
         return agentId;
@@ -62,6 +75,10 @@ public class DCEAgent {
 
     public GlobalSolutionFunction getTargetFn() {
         return targetFn;
+    }
+
+    public double getRmse() {
+        return rmse;
     }
 
     // constructor
@@ -84,15 +101,34 @@ public class DCEAgent {
     }
 
     // TODO: prevent multiple undesired calls to start()
-    public void start() {
+    public void start() throws IOException {
         logger.info("agent({}) started", agentId);
         logger.info("connecting to redis at {}:{}", redisHost, redisPort);
         Jedis jedis = new Jedis(redisHost, redisPort);
+
+        String agentIdStr = String.format("%05d", agentId);
+
+        String timerName = name(DCEAgent.class, agentIdStr, "iteration", "timer");
+        Timer iteration_timer = registry.timer(timerName);
+
+        String gaugeName = name(DCEAgent.class, agentIdStr, "rmse", "gauge");
+        registry.register(gaugeName, (Gauge<Double>) () -> rmse);
+
+        JmxReporter jmxReporter = JmxReporter.forRegistry(registry).build();
+        jmxReporter.start();
+
+        org.apache.log4j.Logger csvLogger = org.apache.log4j.Logger.getLogger(agentIdStr);
+        csvLogger.setLevel(Level.INFO);
+        Path parentPath = Paths.get(System.getenv("HOME"), ".dce");
+        parentPath.toFile().mkdirs(); // create any necessary parent directories
+        Path csvPath = Paths.get(parentPath.toString(), agentIdStr + ".csv");
+        csvLogger.addAppender(new FileAppender(new SimpleLayout(), csvPath.toString()));
 
         ps.initParameters();
         ps.clearParameters(1);
 
         for (int i = 1; i <= maxIter; i++) {
+            Timer.Context iteration_timer_context = iteration_timer.time();
 
             // weight given to our own estimates
             double selfWeight = neighWeights.get(agentId);
@@ -147,11 +183,14 @@ public class DCEAgent {
             sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
 
             synchronized (ps.getLocks()[ps.currInd(i)]) {
-                double rmse = CrossEntropyOptimization.rmse(ps.getMus()[ps.currInd(i)], targetFn.getSoln());
+                double [] mu = ps.getMus()[ps.currInd(i)];
+                rmse = CrossEntropyOptimization.rmse(mu, targetFn.getSoln());
+                csvLogger.info(String.format("%d, %f, %s", i, rmse, GSON.toJson(mu)));
                 logger.info("completed iteration({}), rmse: {}", i, rmse);
             }
+            iteration_timer_context.stop();
         }
-        logger.info("final sigma: {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigmas()[maxIter % 2]);
+        // logger.info("final sigma: {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigmas()[maxIter % 2]);
         logger.info("final mu: {\"mu_{}_{}\": {{}}}", agentId, maxIter, ps.getMus()[maxIter % 2]);
     }
 
@@ -159,7 +198,7 @@ public class DCEAgent {
         if (logger.isTraceEnabled()) {
             synchronized (ps.getLocks()[ps.currInd(i)]) {
                 logger.trace("{} {\"mu_{}_{}\": {{}}}", msg, agentId, i, ps.getMus()[ps.currInd(i)]);
-                logger.trace("{} {\"sigma_{}_{}\": {{}}}", msg, agentId, i, ps.getSigmas()[ps.currInd(i)]);
+                // logger.trace("{} {\"sigma_{}_{}\": {{}}}", msg, agentId, i, ps.getSigmas()[ps.currInd(i)]);
             }
         }
     }

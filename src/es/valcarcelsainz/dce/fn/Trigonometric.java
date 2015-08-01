@@ -14,7 +14,7 @@ public class Trigonometric extends GlobalSolutionFunction {
 
     @Override
     public double [] getSoln() {
-        double [] soln = new double[20];
+        double [] soln = new double[200];
         Arrays.fill(soln, .9);
         return soln;
     }

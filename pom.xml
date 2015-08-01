@@ -37,6 +37,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
+        <metrics.version>3.1.2</metrics.version>
         <smile-math.version>1.0.3</smile-math.version>
         <jedis.version>2.7.2</jedis.version>
         <gson.version>2.3.1</gson.version>
@@ -56,6 +57,12 @@
     </repositories>
 
     <dependencies>
+
+        <dependency>
+            <groupId>io.dropwizard.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>com.github.haifengl</groupId>
