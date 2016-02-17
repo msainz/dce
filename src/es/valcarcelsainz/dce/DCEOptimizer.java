@@ -65,6 +65,7 @@ public class DCEOptimizer {
                 .help("log level (default: debug)");
         parser.addArgument("-r", "--redis-host")
                 .nargs("?")
+                .setDefault("127.0.0.1")
                 .help("redis host acting as message broker");
         parser.addArgument("-p", "--redis-port")
                 .nargs("?")
