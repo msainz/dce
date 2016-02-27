@@ -305,7 +305,7 @@ public class DCEAgent {
         Path parentPath = Paths.get(System.getenv("HOME"), ".dce");
         parentPath.toFile().mkdirs(); // create any necessary parent directories
         Path csvPath = Paths.get(parentPath.toString(), agentIdStr + ".csv");
-        csvLogger.addAppender(new FileAppender(new SimpleLayout(), csvPath.toString()));
+        csvLogger.addAppender(new FileAppender(new SimpleLayout(), csvPath.toString(), /* append */ false, /* bufferedIO */ true, /* bufferSize */ 1024));
 
         initParameters();
         clearParameters(1);
