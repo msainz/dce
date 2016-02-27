@@ -87,6 +87,9 @@ public class DCEAgent {
         this.redisPort = redisPort;
         this.targetFn = targetFn;
 
+        initParameters();
+        clearParameters(1);
+
         subscribeToBroadcast();
         subscribeToNeighbors();
 
@@ -306,9 +309,6 @@ public class DCEAgent {
         parentPath.toFile().mkdirs(); // create any necessary parent directories
         Path csvPath = Paths.get(parentPath.toString(), agentIdStr + ".csv");
         csvLogger.addAppender(new FileAppender(new SimpleLayout(), csvPath.toString(), /* append */ false, /* bufferedIO */ true, /* bufferSize */ 1024));
-
-        initParameters();
-        clearParameters(1);
 
         for (int i = 1; i <= maxIter; i++) {
             Timer.Context iteration_timer_context = iteration_timer.time();
