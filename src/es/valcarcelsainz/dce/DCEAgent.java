@@ -1,5 +1,19 @@
 package es.valcarcelsainz.dce;
 
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Phaser;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.JmxReporter;
 import com.codahale.metrics.MetricRegistry;
@@ -17,18 +31,6 @@ import redis.clients.jedis.JedisPubSub;
 import smile.math.Math;
 import smile.math.Random;
 import smile.sort.IQAgent;
-
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Phaser;
 
 import static com.codahale.metrics.MetricRegistry.name;
 import static smile.math.Math.*;
@@ -178,18 +180,23 @@ public class DCEAgent {
                 mus[prevInd(i)], sigmas[prevInd(i)],
                 new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
         );
+        double gamma = computeGamma(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
+        return new Object[]{f, gamma};
+    }
+
+    static double computeGamma(double[][] xs, double[] ys, Supplier<double[]> f, Function<double[], Double> jfn, double gammaQuantile) {
         int numSamples = xs.length;
         int M = xs[0].length;
+
         IQAgent gammaFinder = new IQAgent(M);
         for (int xsInd = 0; xsInd < numSamples; xsInd++) {
-            double[] x = f.rand();
-            double y = J.f(x);
+            double[] x = f.get();
+            double y = jfn.apply(x);
             xs[xsInd] = x;
             ys[xsInd] = y;
             gammaFinder.add(y);
         }
-        double gamma = gammaFinder.quantile(gammaQuantile);
-        return new Object[]{f, gamma};
+        return gammaFinder.quantile(gammaQuantile);
     }
 
     // see eqn. (32)(top)
