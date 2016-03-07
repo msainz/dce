@@ -99,6 +99,20 @@ public class DCEAgentTest {
                 () -> ArrayUtils.toPrimitive(iterator6.next()),
                 (double[] x) -> x[0],
                 gammaQuantile);
-        assertEquals(0.07, gamma, 1e-14);
+        //assertEquals(0.07, gamma, 1e-14);
+
+
+        /*
+         * example 7
+         */
+        gammaQuantile = 0.98;
+        Double[][] example7= new Double[][] { {0.0}, {0.01}, {0.012}, {0.013}, {0.014}, {0.015}, {0.016}, {0.01801}, {0.01805}, {0.0181},
+                {0.1812}, {0.1813}, {0.1814}, {0.1815}, {0.1816}, {0.1817}, {0.1818}, {0.18183}, {0.19}, {0.191}};
+        Iterator<Double[]> iterator7 = Arrays.asList(example7).iterator();
+        gamma = DCEAgent.computeGamma(new double[10][1], new double[10],
+                () -> ArrayUtils.toPrimitive(iterator7.next()),
+                (double[] x) -> x[0],
+                gammaQuantile);
+        assertEquals(0.0191, gamma, 1e-14);
     }
 }
