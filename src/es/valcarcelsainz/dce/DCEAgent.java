@@ -6,10 +6,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Phaser;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -180,8 +177,37 @@ public class DCEAgent {
                 mus[prevInd(i)], sigmas[prevInd(i)],
                 new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
         );
-        double gamma = computeGamma(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
+        double gamma = computeGamma2(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
         return new Object[]{f, gamma};
+    }
+
+    static double computeGamma2(double[][] xs, double[] ys, Supplier<double[]> f, Function<double[], Double> jfn, double gammaQuantile) {
+        int numSamples = xs.length;
+        int M = xs[0].length;
+        int maximumSize = (int) Math.round(numSamples * gammaQuantile);
+        TreeSet<Double> pq = new TreeSet(Comparator.<Double>naturalOrder());
+
+        // for potential speedup
+        // using Guava's bounded priority queue:
+        // MinMaxPriorityQueue<Double> pq = MinMaxPriorityQueue
+        //        .orderedBy(Comparator.<Double>naturalOrder())
+        //        .maximumSize(maximumSize)
+        //        .create();
+        //
+        // for further speedup, see
+        // https://github.com/davidmoten/rtree/issues/39
+        // https://github.com/davidmoten/rtree/blob/master/src/main/java/com/github/davidmoten/rtree/internal/util/BoundedPriorityQueue.java
+
+        for (int xsInd = 0; xsInd < numSamples; xsInd++) {
+            double[] x = f.get();
+            double y = jfn.apply(x);
+            xs[xsInd] = x;
+            ys[xsInd] = y;
+            pq.add(y);
+            if(pq.size() > maximumSize)
+                pq.remove(pq.last());
+        }
+        return pq.last();
     }
 
     static double computeGamma(double[][] xs, double[] ys, Supplier<double[]> f, Function<double[], Double> jfn, double gammaQuantile) {

@@ -31,6 +31,12 @@ public class DCEOptimizer {
     // launch 2 processes of 50 agents each:
     //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -i 5 -r localhost -l info"
     //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -i 5 -r localhost -l info"
+    //
+    // to begin computations:
+    //      redis-cli publish broadcast start
+    //
+    // to see all argument options:
+    //      mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
     public static void main(final String[] args) {
         final ArgumentParser parser = ArgumentParsers
                 .newArgumentParser("dce-optimize")
