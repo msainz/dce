@@ -47,8 +47,8 @@ public class DCEAgent {
     final Map<Integer, Double> neighWeights; // TODO: use immutable map
     final int agentId; // k
     final int maxIter;
-    final double gammaQuantile = 0.98;
-    final double epsilon = 1e12;
+    final double gammaQuantile;
+    final double epsilon;
     final String redisHost;
     final int redisPort;
 
@@ -78,10 +78,12 @@ public class DCEAgent {
 
     // constructor
     DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
-             String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
+             double gammaQuantile, double epsilon, String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
         this.agentId = agentId;
         this.neighWeights = neighWeights;
         this.maxIter = maxIter;
+        this.gammaQuantile = gammaQuantile;
+        this.epsilon = epsilon;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;

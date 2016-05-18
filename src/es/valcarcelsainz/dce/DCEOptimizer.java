@@ -29,8 +29,8 @@ public class DCEOptimizer {
     // single process with 3 agents:
     //      MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Dejong -i 500 -r localhost -l info" | grep 'mainThread(0)'
     // launch 2 processes of 50 agents each:
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -i 5 -r localhost -l info"
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -i 5 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -i 5 -g 0.91 -e 1e7 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -i 5 -g 0.91 -e 1e7 -r localhost -l info"
     //
     // to begin computations:
     //      redis-cli publish broadcast start
@@ -64,6 +64,16 @@ public class DCEOptimizer {
                 .type(Integer.class)
                 .setDefault(500)
                 .help("maximum number of iterations to run");
+        parser.addArgument("-g", "--gamma-quantile")
+                .nargs("?")
+                .type(Double.class)
+                .setDefault(0.9)
+                .help("exploration/exploitation parameter in the range (0, 1), values closer to 1 lower exploration");
+        parser.addArgument("-e", "--epsilon")
+                .nargs("?")
+                .type(Double.class)
+                .setDefault(1e6)
+                .help("slope of smooth indicator function");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")
                 .choices("trace", "debug", "info")
@@ -92,18 +102,33 @@ public class DCEOptimizer {
             final int maxIter = parsedArgs.getInt("max_iterations");
             logger.info("Running {} max iterations", maxIter);
 
+            final double gammaQuantile = parsedArgs.getDouble("gamma_quantile");
+            logger.info("gamma quantile: {}", gammaQuantile);
+
+            final double epsilon = parsedArgs.getDouble("epsilon");
+            logger.info("epsilon: {}", epsilon);
+
             final String redisHost = parsedArgs.getString("redis_host");
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
 
-            Map<Integer, Map<Integer,Double>> agentToNeighborWeightsMap =
+            Map<Integer, Map<Integer, Double>> agentToNeighborWeightsMap =
                     getAgentToNeighborWeightsMap(parsedArgs);
-            for (Map.Entry<Integer,Map<Integer,Double>> entry : agentToNeighborWeightsMap .entrySet()) {
+            for (Map.Entry<Integer, Map<Integer, Double>> entry : agentToNeighborWeightsMap.entrySet()) {
                 Integer agentId = entry.getKey();
                 Map<Integer, Double> neighWeights = entry.getValue();
 
                 // instantiate dce-agent
-                DCEAgent agent = new DCEAgent(agentId, neighWeights, maxIter, redisHost, redisPort, targetFn);
+                // this will subscribe to redis channels and wait for a start signal
+                new DCEAgent(
+                        agentId,
+                        neighWeights,
+                        maxIter,
+                        gammaQuantile,
+                        epsilon,
+                        redisHost,
+                        redisPort,
+                        targetFn);
             }
 
         } catch (ArgumentParserException e) {
@@ -124,7 +149,7 @@ public class DCEOptimizer {
         return targetFn;
     }
 
-    private static Map<Integer, Map<Integer,Double>> getAgentToNeighborWeightsMap(Namespace parsedArgs)
+    private static Map<Integer, Map<Integer, Double>> getAgentToNeighborWeightsMap(Namespace parsedArgs)
             throws IOException {
         Logger logger = LoggerFactory.getLogger(DCEOptimizer.class);
         String weights_path = parsedArgs.getString("weights_file");
@@ -135,7 +160,7 @@ public class DCEOptimizer {
         int numAgents = Math.max(0, parsedArgs.getInt("num_agents"));
         numAgents = ((0 < numAgents) ? Math.min(numAgents, totalAgents) : totalAgents) - agentOffset;
         logger.info("Agent offset: {}, count: {}, total: {}", agentOffset, numAgents, totalAgents);
-        final Map<Integer, Map<Integer,Double>> agentToNeighWeightsMap = new HashMap<>();
+        final Map<Integer, Map<Integer, Double>> agentToNeighWeightsMap = new HashMap<>();
         int recordNumber = 0;
         for (CSVRecord record : agentWeightRecords) {
             if (recordNumber < agentOffset) {
@@ -144,7 +169,7 @@ public class DCEOptimizer {
                 recordNumber++;
                 continue;
             }
-            Map<Integer,Double> neighWeights = new HashMap<>();
+            Map<Integer, Double> neighWeights = new HashMap<>();
             double sumNeighWeights = 0.0; // just to check that neigh weights add to 1
             for (int neighIndex = 0; neighIndex < totalAgents; neighIndex++) {
                 double neighWeight = Double.parseDouble(record.get(neighIndex));
@@ -190,5 +215,5 @@ public class DCEOptimizer {
         dceLogger.addAppender(new ConsoleAppender(
                 new PatternLayout(PatternLayout.TTCC_CONVERSION_PATTERN), ConsoleAppender.SYSTEM_OUT));
     }
-    
+
 }
