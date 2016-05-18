@@ -13,9 +13,15 @@ import static smile.math.Math.*;
  */
 public class Griewank extends GlobalSolutionFunction {
 
+    public final int M;
+
+    public Griewank(Integer M) {
+        this.M = M;
+    }
+
     @Override
     public double [] getSoln() {
-        double [] soln = new double[20];
+        double [] soln = new double[M];
         Arrays.fill(soln, 0.);
         return soln;
     }
@@ -23,7 +29,6 @@ public class Griewank extends GlobalSolutionFunction {
     @Override
     public double f(double [] x) {
         checkDim(x);
-        int M = getDim();
         double sum = 0.;
         double product = 1.;
         for (int i = 0; i < M; i++) {

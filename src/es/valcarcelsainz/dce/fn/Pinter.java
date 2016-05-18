@@ -11,15 +11,20 @@ import static smile.math.Math.*;
  */
 public class Pinter extends GlobalSolutionFunction {
 
+    public final int M;
+
+    public Pinter(Integer M) {
+        this.M = M;
+    }
+
     @Override
     public double[] getSoln() {
-        return new double[20];
+        return new double[M];
     }
 
     @Override
     public double f(double[] _x) {
         checkDim(_x);
-        int M = getDim();
         double [] x = new double[M+2];
         System.arraycopy(_x, 0, x, 1, M);
         x[0] = x[M];

@@ -204,7 +204,7 @@ public final class SCEAgent {
             //new Shekel(),
             //new Rosenbrock(),
             //new Powell(),
-            new Trigonometric(),
+            new Trigonometric(200),
             //new Griewank(),
             //new Pinter(),
         };

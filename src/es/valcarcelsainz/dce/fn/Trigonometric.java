@@ -12,9 +12,15 @@ import java.util.Arrays;
  */
 public class Trigonometric extends GlobalSolutionFunction {
 
+    public final int M;
+
+    public Trigonometric(Integer M) {
+        this.M = M;
+    }
+
     @Override
     public double [] getSoln() {
-        double [] soln = new double[200];
+        double [] soln = new double[M];
         Arrays.fill(soln, .9);
         return soln;
     }
@@ -22,7 +28,6 @@ public class Trigonometric extends GlobalSolutionFunction {
     @Override
     public double f(double [] x) {
         checkDim(x);
-        int M = getDim();
         double sum = 1.;
         for (int i=0; i<M; i++) {
             sum += 8. * pow(sin(pow( 7. * (x[i] - .9), 2.)), 2.) +

@@ -13,9 +13,15 @@ import static smile.math.Math.pow;
  */
 public class Powell extends GlobalSolutionFunction {
 
+    public final int M;
+
+    public Powell(Integer M) {
+        this.M = M;
+    }
+
     @Override
     public double [] getSoln() {
-        double [] soln = new double[20];
+        double [] soln = new double[M];
         Arrays.fill(soln, 0.);
         return soln;
     }
@@ -23,7 +29,6 @@ public class Powell extends GlobalSolutionFunction {
     @Override
     public double f(double [] x) {
         checkDim(x);
-        int M = getDim();
         double sum = 0.;
         for (int i = 1; i < M-2; i++) {
             sum += pow(x[i-1]+10.*x[i],2.) + 5.*pow(x[i+1]-x[i+2],2.) +

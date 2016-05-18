@@ -11,6 +11,11 @@ import static smile.math.Math.*;
  */
 public class Shekel extends GlobalSolutionFunction {
 
+    public Shekel(Integer M) {
+        if(M != 4)
+            throw new IllegalArgumentException("Shekel only supports 4 dimensions.");
+    }
+
     @Override
     public double [] getSoln() {
         return new double[] {4.,4.,4.,4.};

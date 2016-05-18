@@ -11,6 +11,11 @@ import static smile.math.Math.pow;
  */
 public class Dejong extends GlobalSolutionFunction {
 
+    public Dejong(Integer M) {
+        if(M != 2)
+            throw new IllegalArgumentException("Dejong only supports 2 dimensions.");
+    }
+
     @Override
     public double [] getSoln() {
         return new double[] {-32.,-32.};

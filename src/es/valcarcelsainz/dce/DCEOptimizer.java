@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
@@ -29,8 +30,8 @@ public class DCEOptimizer {
     // single process with 3 agents:
     //      MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Dejong -i 500 -r localhost -l info" | grep 'mainThread(0)'
     // launch 2 processes of 50 agents each:
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -i 5 -g 0.91 -e 1e7 -r localhost -l info"
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -i 5 -g 0.91 -e 1e7 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -r localhost -l info"
     //
     // to begin computations:
     //      redis-cli publish broadcast start
@@ -49,6 +50,11 @@ public class DCEOptimizer {
                 .required(true)
                 .choices("Dejong", "Griewank", "Pinter", "Powell", "Rosenbrock", "Shekel", "Trigonometric")
                 .help("target function to optimize (default: Pinter)");
+        parser.addArgument("-m", "--dimensionality")
+                .nargs("?")
+                .type(Integer.class)
+                .setDefault(2)
+                .help("target function dimensionality");
         parser.addArgument("-o", "--agent-offset")
                 .nargs("?")
                 .type(Integer.class)
@@ -95,7 +101,10 @@ public class DCEOptimizer {
 
             setupLogger(parsedArgs.getString("log_level"));
 
-            final GlobalSolutionFunction targetFn = getTargetFn(parsedArgs);
+            final int M = parsedArgs.getInt("dimensionality");
+            logger.info("dimensionality M: {}", M);
+
+            final GlobalSolutionFunction targetFn = getTargetFn(parsedArgs, M);
             logger.info("Target function: {} in M={} dimensions", targetFn.getClass().getName(), targetFn.getDim());
             logger.trace("Target function known global solution at: {}", Arrays.toString(targetFn.getSoln()));
 
@@ -134,18 +143,20 @@ public class DCEOptimizer {
         } catch (ArgumentParserException e) {
             parser.handleError(e);
             System.exit(1);
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IOException e) {
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | IOException | NoSuchMethodException | InvocationTargetException e) {
             e.printStackTrace(System.err);
         }
     }
 
-    public static GlobalSolutionFunction getTargetFn(Namespace parsedArgs) throws InstantiationException,
-            IllegalAccessException, ClassNotFoundException {
+    public static GlobalSolutionFunction getTargetFn(Namespace parsedArgs, final int M) throws InstantiationException,
+            IllegalAccessException, ClassNotFoundException, NoSuchMethodException, InvocationTargetException {
         String targetFnClassName = String.format("%s.%s",
                 GlobalSolutionFunction.class.getPackage().getName(),
                 parsedArgs.getList("target_function").get(0));
         final GlobalSolutionFunction targetFn =
-                (GlobalSolutionFunction) ClassUtils.getClass(targetFnClassName).newInstance();
+                (GlobalSolutionFunction) ClassUtils.getClass(targetFnClassName)
+                        .getDeclaredConstructor(Integer.class)
+                        .newInstance(M);
         return targetFn;
     }
 

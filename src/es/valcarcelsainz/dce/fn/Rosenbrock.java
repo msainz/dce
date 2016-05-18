@@ -12,9 +12,15 @@ import java.util.Arrays;
  */
 public class Rosenbrock extends GlobalSolutionFunction  {
 
+    public final int M;
+
+    public Rosenbrock(Integer M) {
+        this.M = M;
+    }
+
     @Override
     public double [] getSoln() {
-        double [] soln = new double[4];
+        double [] soln = new double[M];
         Arrays.fill(soln, 1.);
         return soln;
     }
@@ -22,7 +28,6 @@ public class Rosenbrock extends GlobalSolutionFunction  {
     @Override
     public double f(double [] x) {
         checkDim(x);
-        int M = getDim();
         double sum = 0.;
         for (int i = 0; i < M-1; i++) {
             sum += 100.*pow(x[i+1]-pow(x[i],2.),2.) + pow(x[i]-1,2.);
