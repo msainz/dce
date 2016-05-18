@@ -18,6 +18,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -39,6 +42,8 @@ public class DCEOptimizer {
     // to see all argument options:
     //      mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
     public static void main(final String[] args) {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        Path resultsDefaultDirPath = Paths.get(System.getenv("HOME"), ".dce", timeStamp);
         final ArgumentParser parser = ArgumentParsers
                 .newArgumentParser("dce-optimize")
                 .description("Optimize a black-box multivariate function using (Distributed) Cross-Entropy");
@@ -85,6 +90,10 @@ public class DCEOptimizer {
                 .choices("trace", "debug", "info")
                 .setDefault("debug")
                 .help("log level (default: debug)");
+        parser.addArgument("-d", "--results-directory")
+                .nargs("?")
+                .setDefault(resultsDefaultDirPath.toString())
+                .help("path of result files");
         parser.addArgument("-r", "--redis-host")
                 .nargs("?")
                 .setDefault("127.0.0.1")
@@ -121,8 +130,12 @@ public class DCEOptimizer {
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
 
+            final String resultsDirPath = parsedArgs.getString("results_directory");
+            logger.info("Results directory path: {}", resultsDirPath);
+
             Map<Integer, Map<Integer, Double>> agentToNeighborWeightsMap =
                     getAgentToNeighborWeightsMap(parsedArgs);
+
             for (Map.Entry<Integer, Map<Integer, Double>> entry : agentToNeighborWeightsMap.entrySet()) {
                 Integer agentId = entry.getKey();
                 Map<Integer, Double> neighWeights = entry.getValue();
@@ -137,7 +150,8 @@ public class DCEOptimizer {
                         epsilon,
                         redisHost,
                         redisPort,
-                        targetFn);
+                        targetFn,
+                        resultsDirPath);
             }
 
         } catch (ArgumentParserException e) {

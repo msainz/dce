@@ -51,6 +51,7 @@ public class DCEAgent {
     final double epsilon;
     final String redisHost;
     final int redisPort;
+    final Path resultsDirPath;
 
     // pace multi-threaded computation
     final Phaser muPhaser = new Phaser();
@@ -78,7 +79,8 @@ public class DCEAgent {
 
     // constructor
     DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
-             double gammaQuantile, double epsilon, String redisHost, Integer redisPort, GlobalSolutionFunction targetFn) {
+             double gammaQuantile, double epsilon, String redisHost, Integer redisPort, GlobalSolutionFunction targetFn,
+             String resultsDirPath) {
         this.agentId = agentId;
         this.neighWeights = neighWeights;
         this.maxIter = maxIter;
@@ -87,6 +89,7 @@ public class DCEAgent {
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
+        this.resultsDirPath = Paths.get(resultsDirPath);
 
         initParameters();
         clearParameters(1);
@@ -340,9 +343,8 @@ public class DCEAgent {
 
         org.apache.log4j.Logger csvLogger = org.apache.log4j.Logger.getLogger(agentIdStr);
         csvLogger.setLevel(Level.INFO);
-        Path parentPath = Paths.get(System.getenv("HOME"), ".dce");
-        parentPath.toFile().mkdirs(); // create any necessary parent directories
-        Path csvPath = Paths.get(parentPath.toString(), agentIdStr + ".csv");
+        resultsDirPath.toFile().mkdirs(); // create any necessary parent directories
+        Path csvPath = Paths.get(resultsDirPath.toString(), agentIdStr + ".csv");
         csvLogger.addAppender(new FileAppender(new SimpleLayout(), csvPath.toString(), /* append */ false, /* bufferedIO */ true, /* bufferSize */ 1024));
 
         for (int i = 1; i <= maxIter; i++) {
