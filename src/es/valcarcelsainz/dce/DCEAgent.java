@@ -48,6 +48,8 @@ public class DCEAgent {
     final int agentId; // k
     final int maxIter;
     final double gammaQuantile;
+    final double lowerBound;
+    final double upperBound;
     final double epsilon;
     final String redisHost;
     final int redisPort;
@@ -78,19 +80,25 @@ public class DCEAgent {
     };
 
     // constructor
-    DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter,
-             double gammaQuantile, double epsilon, String redisHost, Integer redisPort, GlobalSolutionFunction targetFn,
-             String resultsDirPath) {
+    DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter, double gammaQuantile,
+             double lowerBound, double upperBound, double epsilon, String redisHost, Integer redisPort,
+             GlobalSolutionFunction targetFn, String resultsDirPath) {
+
         this.agentId = agentId;
         this.neighWeights = neighWeights;
         this.maxIter = maxIter;
         this.gammaQuantile = gammaQuantile;
+        this.lowerBound = lowerBound;
+        this.upperBound = upperBound;
         this.epsilon = epsilon;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
         this.resultsDirPath = Paths.get(resultsDirPath);
 
+        // initialize mus[0] to M uniformly-random numbers in [lowerBound, upperBound]
+        // and sigmas[0] to a M x M diagonal matrix with 1000 along the diagonal; and
+        // initialize mus[1] to M zeros and sigmas[0] to M x M zeros
         initParameters();
         clearParameters(1);
 
@@ -155,7 +163,7 @@ public class DCEAgent {
                 mus[j] = new double[M];
                 sigmas[j] = new double[M][M];
                 long seed = System.currentTimeMillis() + Thread.currentThread().getId();
-                new Random(seed).nextDoubles(mus[j], -100d, 100d);
+                new Random(seed).nextDoubles(mus[j], this.lowerBound, this.upperBound);
                 for (int i = 0; i < mus[j].length; i++) {
                     sigmas[j][i][i] = 1000;
                 }

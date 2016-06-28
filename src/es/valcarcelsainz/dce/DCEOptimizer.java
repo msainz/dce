@@ -80,6 +80,16 @@ public class DCEOptimizer {
                 .type(Double.class)
                 .setDefault(0.9)
                 .help("exploration/exploitation parameter in the range (0, 1), values closer to 1 lower exploration");
+        parser.addArgument("-lb", "--lower-bound")
+                .nargs("?")
+                .type(Double.class)
+                .setDefault(-50.0)
+                .help("lower bound for uniform hyper-box used in parameter initialization");
+        parser.addArgument("-ub", "--upper-bound")
+                .nargs("?")
+                .type(Double.class)
+                .setDefault(50.0)
+                .help("upper bound for uniform hyper-box used in parameter initialization");
         parser.addArgument("-e", "--epsilon")
                 .nargs("?")
                 .type(Double.class)
@@ -123,6 +133,10 @@ public class DCEOptimizer {
             final double gammaQuantile = parsedArgs.getDouble("gamma_quantile");
             logger.info("gamma quantile: {}", gammaQuantile);
 
+            final double lowerBound = parsedArgs.getDouble("lower_bound");
+            final double upperBound = parsedArgs.getDouble("upper_bound");
+            logger.info("uniform hyper-box bounds: [{}, {}]", lowerBound, upperBound);
+
             final double epsilon = parsedArgs.getDouble("epsilon");
             logger.info("epsilon: {}", epsilon);
 
@@ -147,6 +161,8 @@ public class DCEOptimizer {
                         neighWeights,
                         maxIter,
                         gammaQuantile,
+                        lowerBound,
+                        upperBound,
                         epsilon,
                         redisHost,
                         redisPort,
