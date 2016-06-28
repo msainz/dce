@@ -272,9 +272,10 @@ public class DCEAgent {
         updateMu(i, weight, muHat);
     }
 
-    // see eqn. (32)(bottom)
-    // performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
-    static void computeSigmaHat(double[][] sigma_hat, double[] mu_curr, double[] mu_prev,
+    // TODO add eqn. number reference <old: see eqn. (32)(bottom)>
+    // old: performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
+    // new: performs sigma <- (1 - alpha)(sigma + mu_prev * mu_prev^T) + ((alpha / denom) * numer)
+    static void computeSigmaHat(double[][] sigma_hat, double[] mu_prev,
                                 double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
         int numSamples = ys.length;
         assert xs.length == ys.length;
@@ -286,20 +287,18 @@ public class DCEAgent {
             double[] x = xs[xsInd];
             double y = ys[xsInd];
             double I = smoothIndicator(y, gamma, epsilon);
-            minus(x, mu_curr);
             // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
             double[][] A = new double[][]{x}; // 1 x M
             plus(numer, scaleA(I, atamm(A))); // M x M
             denom += I;
         }
-        minus(mu_prev, mu_curr);
         double[][] A = new double[][]{mu_prev}; // 1 x M
         plus(sigma_hat, atamm(A)); // M x M
         scaleA(1d - alpha, sigma_hat);
         plus(sigma_hat, scaleA(alpha / denom, numer));
     }
 
-    void updateSigma(int i, double weight, double[][] sigma_hat) {
+    void updateSigma(int i, double weight, double[][] sigma_hat, double[] mu_curr) {
         synchronized (locks[currInd(i)]) {
             // using a+bc == b(a/b+c) to avoid
             // allocating a new array
@@ -312,6 +311,8 @@ public class DCEAgent {
                     sigma[j][k] *= weight;
                 }
             }
+            double[][] A = new double[][]{mu_curr}; // 1 x M
+            minus(sigma, atamm(A)); // M x M
         }
     }
 
@@ -391,9 +392,8 @@ public class DCEAgent {
             double[][] sigma_hat = f.sigma; // same ugly optimization
 
             // neither mu will receive updates at this point
-            computeSigmaHat(sigma_hat, mus[currInd(i)], mus[prevInd(i)],
-                    xs, ys, alpha, gamma, epsilon);
-            updateSigma(i, selfWeight, sigma_hat);
+            computeSigmaHat(sigma_hat, mus[prevInd(i)], xs, ys, alpha, gamma, epsilon);
+            updateSigma(i, selfWeight, sigma_hat, mus[currInd(i)]);
 
             // at this point it's safe to clear mu_i-1 and sigma_i-1
             clearParameters(prevInd(i));
