@@ -332,6 +332,9 @@ public class DCEAgent {
         plus(sigma_hat, atamm(A)); // M x M
         scaleA(1d - alpha, sigma_hat);
         plus(sigma_hat, scaleA(alpha / denom, numer));
+
+         double[][] B = new double[][]{mu_curr}; // 1 x M
+         minus(sigma_hat, atamm(B)); // M x M
     }
 
     void updateSigma(int i, double weight, double[][] sigma_hat) {
@@ -419,7 +422,7 @@ public class DCEAgent {
 
             // compute mu_hat of current iteration i, eqn. (32)(top)
             computeMuHat(mu_hat, xs, ys, alpha, gamma, epsilon);
-            updateMu(i, selfWeight, mu_hat);
+            updateMu(i, 1.0 /*selfWeight*/, mu_hat);
 
             // broadcast mu_hat to neighbors
             publish(jedis, GSON.toJson(mu_hat), i, Message.PayloadType.MU);
@@ -435,8 +438,8 @@ public class DCEAgent {
 
             // neither mu will receive updates at this point
             computeSigmaHat(sigma_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon);
-            updateSigma(i, selfWeight, sigma_hat);
-            updateSigma(i, mus[currInd(i)]);
+            updateSigma(i, 1.0 /*selfWeight*/, sigma_hat);
+            // updateSigma(i, mus[currInd(i)]);
 
             // broadcast sigma_hat to neighbors
             publish(jedis, GSON.toJson(sigma_hat), i, Message.PayloadType.SIGMA);
@@ -551,11 +554,11 @@ public class DCEAgent {
                     double neighWeight = neighWeights.get(in.fromAgentId);
                     switch (in.type) {
                         case MU:
-                            updateMu(in.i, neighWeight, in.payload);
+                            // updateMu(in.i, neighWeight, in.payload);
                             muPhaser.arrive();
                             break;
                         case SIGMA:
-                            updateSigma(in.i, neighWeight, in.payload);
+                            // updateSigma(in.i, neighWeight, in.payload);
                             sigmaPhaser.arrive();
                             break;
                         default:
