@@ -184,12 +184,38 @@ public class DCEAgent {
     // create new surrogate gaussian with mu and sigma from prev iteration
     // which won't receive more updates by the time this method is called
     Object[] sampleNewGaussian(int i, double[][] xs, double[] ys, GlobalSolutionFunction J) {
-        MultivariateGaussianDistribution f = new MultivariateGaussianDistribution(
-                // this constructor deep-copies mu[i] and sigma[i]
-                // later accessible via f.mean() and f.cov() respectively
-                mus[prevInd(i)], sigmas[prevInd(i)],
-                new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
-        );
+        MultivariateGaussianDistribution f;
+        try {
+            f = new MultivariateGaussianDistribution(
+                    // this constructor deep-copies mu[i] and sigma[i]
+                    // later accessible via f.mean() and f.cov() respectively
+                    mus[prevInd(i)], sigmas[prevInd(i)],
+                    new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
+            );
+        } catch(IllegalArgumentException e) {
+            logger.info("{\"mu_{}_{}\": {{}}}", agentId, i-1, mus[prevInd(i)]);
+            logger.info("{\"sigma_{}_{}\": {{}}}", agentId, i-1, sigmas[prevInd(i)]);
+            throw e;
+        }
+
+        // TODO refer to eqn. (32)
+        //  2) Que la primera distribución de muestreo sea una uniforme en la
+        //  hyper-box. Es decir, sería algo como
+        //  if (iteración == 1) {
+        //      xs = Uniform( hyperbox );
+        //  } else {
+        //      xs = MultivariateGaussian ( mu, cov );
+        //  }
+
+        //  RandomDistribution h;
+        //  if (1 == i) {
+        //      UniformDistribution g = new UniformDistribution(lBound, uBound);
+        //      h = g;
+        //  } else {
+        //      h = f;
+        //  }
+        //  double gamma = computeGamma2(xs, ys, () -> h.rand(), (double[] x) -> J.f(x), gammaQuantile);
+
         double gamma = computeGamma2(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
         return new Object[]{f, gamma};
     }
@@ -217,7 +243,7 @@ public class DCEAgent {
             xs[xsInd] = x;
             ys[xsInd] = y;
             pq.add(y);
-            if(pq.size() > maximumSize)
+            if (pq.size() > maximumSize)
                 pq.remove(pq.last());
         }
         return pq.last();
@@ -283,7 +309,7 @@ public class DCEAgent {
     // TODO add eqn. number reference <old: see eqn. (32)(bottom)>
     // old: performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
     // new: performs sigma <- (1 - alpha)(sigma + mu_prev * mu_prev^T) + ((alpha / denom) * numer)
-    static void computeSigmaHat(double[][] sigma_hat, double[] mu_prev,
+    static void computeSigmaHat(double[][] sigma_hat, double[] mu_prev, double[] mu_curr,
                                 double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
         int numSamples = ys.length;
         assert xs.length == ys.length;
@@ -295,11 +321,13 @@ public class DCEAgent {
             double[] x = xs[xsInd];
             double y = ys[xsInd];
             double I = smoothIndicator(y, gamma, epsilon);
+            // minus(x, mu_curr); // old
             // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
             double[][] A = new double[][]{x}; // 1 x M
             plus(numer, scaleA(I, atamm(A))); // M x M
             denom += I;
         }
+        // minus(mu_prev, mu_curr); // old
         double[][] A = new double[][]{mu_prev}; // 1 x M
         plus(sigma_hat, atamm(A)); // M x M
         scaleA(1d - alpha, sigma_hat);
@@ -319,6 +347,12 @@ public class DCEAgent {
                     sigma[j][k] *= weight;
                 }
             }
+        }
+    }
+
+    void updateSigma(int i, double[] mu_curr) {
+        synchronized (locks[currInd(i)]) {
+            double[][] sigma = sigmas[currInd(i)];
             double[][] A = new double[][]{mu_curr}; // 1 x M
             minus(sigma, atamm(A)); // M x M
         }
@@ -379,8 +413,8 @@ public class DCEAgent {
             logger.trace("i: {} | alpha: {} | gamma: {}", i, alpha, gamma);
 
             // ugly optimization, but since we don't need to draw any more
-            // samples from f, we'll reuse it's internal register as buffer
-            // instead of making another deep copy of mu (and sigma)
+            // samples from f, we'll reuse its internal register as buffer
+            // instead of making another deep copy of mu and sigma
             double[] mu_hat = f.mu; // effectively, mus[prevInd(i)]
 
             // compute mu_hat of current iteration i, eqn. (32)(top)
@@ -400,15 +434,15 @@ public class DCEAgent {
             double[][] sigma_hat = f.sigma; // same ugly optimization
 
             // neither mu will receive updates at this point
-            computeSigmaHat(sigma_hat, mus[prevInd(i)], xs, ys, alpha, gamma, epsilon);
+            computeSigmaHat(sigma_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon);
             updateSigma(i, selfWeight, sigma_hat);
             updateSigma(i, mus[currInd(i)]);
 
-            // at this point it's safe to clear mu_i-1 and sigma_i-1
-            clearParameters(prevInd(i));
-
             // broadcast sigma_hat to neighbors
             publish(jedis, GSON.toJson(sigma_hat), i, Message.PayloadType.SIGMA);
+
+            // at this point it's safe to clear mu_i-1 and sigma_i-1
+            clearParameters(prevInd(i));
 
             // compute sigma, eqn. (33)(bottom)
             // wait for all neighbors' sigma_hat for current iteration i
