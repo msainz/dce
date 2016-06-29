@@ -306,7 +306,7 @@ public class DCEAgent {
         plus(sigma_hat, scaleA(alpha / denom, numer));
     }
 
-    void updateSigma(int i, double weight, double[][] sigma_hat, double[] mu_curr) {
+    void updateSigma(int i, double weight, double[][] sigma_hat) {
         synchronized (locks[currInd(i)]) {
             // using a+bc == b(a/b+c) to avoid
             // allocating a new array
@@ -401,7 +401,8 @@ public class DCEAgent {
 
             // neither mu will receive updates at this point
             computeSigmaHat(sigma_hat, mus[prevInd(i)], xs, ys, alpha, gamma, epsilon);
-            updateSigma(i, selfWeight, sigma_hat, mus[currInd(i)]);
+            updateSigma(i, selfWeight, sigma_hat);
+            updateSigma(i, mus[currInd(i)]);
 
             // at this point it's safe to clear mu_i-1 and sigma_i-1
             clearParameters(prevInd(i));
