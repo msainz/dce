@@ -192,9 +192,9 @@ public class DCEAgent {
                     mus[prevInd(i)], sigmas[prevInd(i)],
                     new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
             );
-        } catch(IllegalArgumentException e) {
-            logger.info("{\"mu_{}_{}\": {{}}}", agentId, i-1, mus[prevInd(i)]);
-            logger.info("{\"sigma_{}_{}\": {{}}}", agentId, i-1, sigmas[prevInd(i)]);
+        } catch (IllegalArgumentException e) {
+            logger.info("{\"mu_{}_{}\": {{}}}", agentId, i - 1, mus[prevInd(i)]);
+            logger.info("{\"sigma_{}_{}\": {{}}}", agentId, i - 1, sigmas[prevInd(i)]);
             throw e;
         }
 
@@ -327,14 +327,14 @@ public class DCEAgent {
             plus(numer, scaleA(I, atamm(A))); // M x M
             denom += I;
         }
-        // minus(mu_prev, mu_curr); // old
+        // minus(mu_prev, mu_curr); // old --> omission of this subtraction gives rise to sigma instability
         double[][] A = new double[][]{mu_prev}; // 1 x M
         plus(sigma_hat, atamm(A)); // M x M
         scaleA(1d - alpha, sigma_hat);
         plus(sigma_hat, scaleA(alpha / denom, numer));
 
-         double[][] B = new double[][]{mu_curr}; // 1 x M
-         minus(sigma_hat, atamm(B)); // M x M
+        double[][] B = new double[][]{mu_curr}; // 1 x M
+        minus(sigma_hat, atamm(B)); // M x M
     }
 
     void updateSigma(int i, double weight, double[][] sigma_hat) {
