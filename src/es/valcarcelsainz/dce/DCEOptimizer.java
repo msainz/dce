@@ -33,13 +33,13 @@ public class DCEOptimizer {
     // single process with 3 agents:
     //      MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Dejong -i 500 -r localhost -l info" | grep 'mainThread(0)'
     // launch 2 processes of 50 agents each:
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -r localhost -l info"
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
     //
     //
 // launch 2 processes of 50 agents each:
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Pinter -m 50 -i 5 -g 0.91 -e 1e7 -r localhost -l info"
-    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Pinter -m 50 -i 500 -g 0.91 -e 1e7 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Pinter -m 50 -i 5 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Pinter -m 50 -i 500 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
 
     // to begin computations:
     //      redis-cli publish broadcast start
@@ -100,6 +100,11 @@ public class DCEOptimizer {
                 .type(Double.class)
                 .setDefault(1e6)
                 .help("slope of smooth indicator function");
+        parser.addArgument("-s", "--number-samples")
+                .nargs("?")
+                .type(Double.class)
+                .setDefault(100)
+                .help("initial number of samples");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")
                 .choices("trace", "debug", "info")
@@ -145,6 +150,9 @@ public class DCEOptimizer {
             final double epsilon = parsedArgs.getDouble("epsilon");
             logger.info("epsilon: {}", epsilon);
 
+            final double initSamples = parsedArgs.getDouble("number_samples");
+            logger.info("initial number samples: {}", initSamples);
+
             final String redisHost = parsedArgs.getString("redis_host");
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
@@ -169,6 +177,7 @@ public class DCEOptimizer {
                         lowerBound,
                         upperBound,
                         epsilon,
+                        initSamples,
                         redisHost,
                         redisPort,
                         targetFn,

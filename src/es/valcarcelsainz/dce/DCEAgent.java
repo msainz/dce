@@ -51,6 +51,7 @@ public class DCEAgent {
     final double lowerBound;
     final double upperBound;
     final double epsilon;
+    final double initSamples;
     final String redisHost;
     final int redisPort;
     final Path resultsDirPath;
@@ -81,7 +82,7 @@ public class DCEAgent {
 
     // constructor
     DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter, double gammaQuantile,
-             double lowerBound, double upperBound, double epsilon, String redisHost, Integer redisPort,
+             double lowerBound, double upperBound, double epsilon, double initSamples, String redisHost, Integer redisPort,
              GlobalSolutionFunction targetFn, String resultsDirPath) {
 
         this.agentId = agentId;
@@ -91,6 +92,7 @@ public class DCEAgent {
         this.lowerBound = lowerBound;
         this.upperBound = upperBound;
         this.epsilon = epsilon;
+        this.initSamples = initSamples;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
@@ -112,8 +114,8 @@ public class DCEAgent {
         return 1. / (1. + exp(-epsilon * (y - gamma)));
     }
 
-    static int computeNumSamplesForIteration(int iteration) {
-        return (int) max(500., pow(iteration, 1.01));
+    static int computeNumSamplesForIteration(int iteration, double initSamples) {
+        return (int) max(initSamples, pow(iteration, 1.01));
     }
 
     static double computeSmoothingForIteration(int iteration) {
@@ -408,7 +410,7 @@ public class DCEAgent {
             double selfWeight = neighWeights.get(agentId);
 
             int M = targetFn.getDim();
-            numSamples = computeNumSamplesForIteration(i);
+            numSamples = computeNumSamplesForIteration(i, initSamples);
             alpha = computeSmoothingForIteration(i);
 
             // array of samples and array of target function evaluations
