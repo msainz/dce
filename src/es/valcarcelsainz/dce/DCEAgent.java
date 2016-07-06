@@ -52,6 +52,7 @@ public class DCEAgent {
     final double upperBound;
     final double epsilon;
     final double initSamples;
+    final boolean regNoise;
     final String redisHost;
     final int redisPort;
     final Path resultsDirPath;
@@ -82,7 +83,7 @@ public class DCEAgent {
 
     // constructor
     DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter, double gammaQuantile,
-             double lowerBound, double upperBound, double epsilon, double initSamples, String redisHost, Integer redisPort,
+             double lowerBound, double upperBound, double epsilon, double initSamples, boolean regNoise, String redisHost, Integer redisPort,
              GlobalSolutionFunction targetFn, String resultsDirPath) {
 
         this.agentId = agentId;
@@ -93,6 +94,7 @@ public class DCEAgent {
         this.upperBound = upperBound;
         this.epsilon = epsilon;
         this.initSamples = initSamples;
+        this.regNoise = regNoise;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
@@ -313,7 +315,7 @@ public class DCEAgent {
     // old: performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
     // new: performs sigma <- (1 - alpha)(sigma + mu_prev * mu_prev^T) + ((alpha / denom) * numer)
     static void computeSigmaHat(double[][] sigma_hat, double[] mu_hat, double[] mu_prev, double[] mu_curr,
-                                double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
+                                double[][] xs, double[] ys, double alpha, double gamma, double epsilon, boolean regNoise) {
         int numSamples = ys.length;
         assert xs.length == ys.length;
         assert xs.length > 0;
@@ -325,10 +327,13 @@ public class DCEAgent {
             double y = ys[xsInd];
             double I = smoothIndicator(y, gamma, epsilon);
 
-            // Old version: introduces noise = sum(a_{lk}*mu_hat*mu_hat') - (sum(a_{lk}*mu_hat)sum(a_{lk}*mu_hat)'
-            // Note that the noise tends to zero as long as the nodes agree in their mean.
-            // minus(x, mu_curr); // old v1
-            // minus(x, mu_hat); // old v2 more appropriate
+            if (regNoise) {
+                // Old version: introduces noise = sum(a_{lk}*mu_hat*mu_hat') - (sum(a_{lk}*mu_hat)sum(a_{lk}*mu_hat)'
+                // Note that the noise tends to zero as long as the nodes agree in their mean.
+                // minus(x, mu_curr); // old v1
+                minus(x, mu_hat); // old v2 more appropriate
+            }
+
 
             // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
             double[][] A = new double[][]{x}; // 1 x M
@@ -336,20 +341,25 @@ public class DCEAgent {
             denom += I;
         }
 
-        // New version: Add mean scatter matrix (mu_prev*mu_prev') to work with covariance instead of correlation matrix.
-        double[][] B = new double[][]{mu_prev}; // 1 x M
-        plus(sigma_hat, atamm(B)); // M x M
-        // Old version: Introduces: noise = sum(a_{lk}*mu_hat*mu_hat') - (sum(a_{lk}*mu_hat)sum(a_{lk}*mu_hat)'
-        // Note that the noise tends to zero as long as the nodes agree in their mean.
-        // minus(mu_prev, mu_curr); // old v1
-        // minus(mu_prev, mu_hat); // old v2 more appropriate
+        if (regNoise) {
+            // Old version: Introduces: noise = sum(a_{lk}*mu_hat*mu_hat') - (sum(a_{lk}*mu_hat)sum(a_{lk}*mu_hat)'
+            // Note that the noise tends to zero as long as the nodes agree in their mean.
+            // minus(mu_prev, mu_curr); // old v1
+            minus(mu_prev, mu_hat); // old v2 more appropriate
+        } else {
+            // New version: Add mean scatter matrix (mu_prev*mu_prev') to work with covariance instead of correlation matrix.
+            double[][] B = new double[][]{mu_prev}; // 1 x M
+            plus(sigma_hat, atamm(B)); // M x M
+        }
+
+
 
         scaleA(1d - alpha, sigma_hat);
         plus(sigma_hat, scaleA(alpha / denom, numer));
 
     }
 
-    void updateSigma(int i, double weight, double[][] sigma_hat, double[] mu_curr) {
+    void updateSigma(int i, double weight, double[][] sigma_hat, double[] mu_curr, boolean regNoise) {
         synchronized (locks[currInd(i)]) {
             // using a+bc == b(a/b+c) to avoid
             // allocating a new array
@@ -363,19 +373,20 @@ public class DCEAgent {
                 }
             }
 
-            // Convert intermediate correlation matrix into a covariance matrix
-            // sigma = corr - mu*mu'
-            double[][] A = new double[][]{mu_curr}; // 1 x M
-            minus(sigma, atamm(A)); // M x M
+            if (!regNoise) {
+                // New version: Convert intermediate correlation matrix into a covariance matrix: sigma = corr - mu*mu'
+                double[][] A = new double[][]{mu_curr}; // 1 x M
+                minus(sigma, atamm(A)); // M x M
+            }
         }
     }
 
 
-    void updateSigma(int i, double weight, String sigma_hat, double[] mu_curr) {
+    void updateSigma(int i, double weight, String sigma_hat, double[] mu_curr, boolean regNoise) {
         Type sigmaType = new TypeToken<double[][]>() {
         }.getType();
         double[][] sigmaHat = GSON.fromJson(sigma_hat, sigmaType);
-        updateSigma(i, weight, sigmaHat, mu_curr);
+        updateSigma(i, weight, sigmaHat, mu_curr, regNoise);
     }
 
     // TODO: prevent multiple undesired calls to start()
@@ -411,6 +422,7 @@ public class DCEAgent {
 
             int M = targetFn.getDim();
             numSamples = computeNumSamplesForIteration(i, initSamples);
+            //logger.info("i: {} | numSamples: {}", i, numSamples);
             alpha = computeSmoothingForIteration(i);
 
             // array of samples and array of target function evaluations
@@ -447,8 +459,8 @@ public class DCEAgent {
             double[][] sigma_hat = f.sigma; // same ugly optimization
 
             // neither mu will receive updates at this point
-            computeSigmaHat(sigma_hat, mu_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon);
-            updateSigma(i, 1.0 /*selfWeight*/, sigma_hat, mus[currInd(i)]);
+            computeSigmaHat(sigma_hat, mu_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon, regNoise);
+            updateSigma(i, 1.0 /*selfWeight*/, sigma_hat, mus[currInd(i)], regNoise);
 
             // broadcast sigma_hat to neighbors
             publish(jedis, GSON.toJson(sigma_hat), i, Message.PayloadType.SIGMA);

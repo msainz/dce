@@ -1,5 +1,6 @@
 package es.valcarcelsainz.dce;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.*;
@@ -105,6 +106,11 @@ public class DCEOptimizer {
                 .type(Double.class)
                 .setDefault(100)
                 .help("initial number of samples");
+        parser.addArgument("-rn", "--reg-noise")
+                .nargs("?")
+                .type(Boolean.class)
+                .setDefault(false)
+                .help("flag to add regularization noise");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")
                 .choices("trace", "debug", "info")
@@ -153,6 +159,9 @@ public class DCEOptimizer {
             final double initSamples = parsedArgs.getDouble("number_samples");
             logger.info("initial number samples: {}", initSamples);
 
+            final boolean regNoise = parsedArgs.getBoolean("reg_noise");
+            logger.info("adaptive regularization noise: {}", regNoise);
+
             final String redisHost = parsedArgs.getString("redis_host");
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
@@ -178,6 +187,7 @@ public class DCEOptimizer {
                         upperBound,
                         epsilon,
                         initSamples,
+                        regNoise,
                         redisHost,
                         redisPort,
                         targetFn,
