@@ -117,7 +117,7 @@ public class DCEAgent {
     }
 
     static double computeSmoothingForIteration(int iteration) {
-        return 2. / pow(iteration + 100., 0.501);
+        return 1. / pow(iteration + 100., 0.501);
     }
 
     // scale each element of a matrix by a constant.
@@ -129,6 +129,7 @@ public class DCEAgent {
         }
         return A;
     }
+
 
     static double mse(double[] x, double[] y) {
         if (x.length != y.length) {
@@ -309,7 +310,7 @@ public class DCEAgent {
     // TODO add eqn. number reference <old: see eqn. (32)(bottom)>
     // old: performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
     // new: performs sigma <- (1 - alpha)(sigma + mu_prev * mu_prev^T) + ((alpha / denom) * numer)
-    static void computeSigmaHat(double[][] sigma_hat, double[] mu_prev, double[] mu_curr,
+    static void computeSigmaHat(double[][] sigma_hat, double[] mu_hat, double[] mu_prev, double[] mu_curr,
                                 double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
         int numSamples = ys.length;
         assert xs.length == ys.length;
@@ -321,23 +322,32 @@ public class DCEAgent {
             double[] x = xs[xsInd];
             double y = ys[xsInd];
             double I = smoothIndicator(y, gamma, epsilon);
-            // minus(x, mu_curr); // old
+
+            // Old version: introduces noise = sum(a_{lk}*mu_hat*mu_hat') - (sum(a_{lk}*mu_hat)sum(a_{lk}*mu_hat)'
+            // Note that the noise tends to zero as long as the nodes agree in their mean.
+            // minus(x, mu_curr); // old v1
+            // minus(x, mu_hat); // old v2 more appropriate
+
             // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
             double[][] A = new double[][]{x}; // 1 x M
             plus(numer, scaleA(I, atamm(A))); // M x M
             denom += I;
         }
-        // minus(mu_prev, mu_curr); // old --> omission of this subtraction gives rise to sigma instability
-        double[][] A = new double[][]{mu_prev}; // 1 x M
-        plus(sigma_hat, atamm(A)); // M x M
+
+        // New version: Add mean scatter matrix (mu_prev*mu_prev') to work with covariance instead of correlation matrix.
+        double[][] B = new double[][]{mu_prev}; // 1 x M
+        plus(sigma_hat, atamm(B)); // M x M
+        // Old version: Introduces: noise = sum(a_{lk}*mu_hat*mu_hat') - (sum(a_{lk}*mu_hat)sum(a_{lk}*mu_hat)'
+        // Note that the noise tends to zero as long as the nodes agree in their mean.
+        // minus(mu_prev, mu_curr); // old v1
+        // minus(mu_prev, mu_hat); // old v2 more appropriate
+
         scaleA(1d - alpha, sigma_hat);
         plus(sigma_hat, scaleA(alpha / denom, numer));
 
-        double[][] B = new double[][]{mu_curr}; // 1 x M
-        minus(sigma_hat, atamm(B)); // M x M
     }
 
-    void updateSigma(int i, double weight, double[][] sigma_hat) {
+    void updateSigma(int i, double weight, double[][] sigma_hat, double[] mu_curr) {
         synchronized (locks[currInd(i)]) {
             // using a+bc == b(a/b+c) to avoid
             // allocating a new array
@@ -350,22 +360,20 @@ public class DCEAgent {
                     sigma[j][k] *= weight;
                 }
             }
-        }
-    }
 
-    void updateSigma(int i, double[] mu_curr) {
-        synchronized (locks[currInd(i)]) {
-            double[][] sigma = sigmas[currInd(i)];
+            // Convert intermediate correlation matrix into a covariance matrix
+            // sigma = corr - mu*mu'
             double[][] A = new double[][]{mu_curr}; // 1 x M
             minus(sigma, atamm(A)); // M x M
         }
     }
 
-    void updateSigma(int i, double weight, String sigma_hat) {
+
+    void updateSigma(int i, double weight, String sigma_hat, double[] mu_curr) {
         Type sigmaType = new TypeToken<double[][]>() {
         }.getType();
         double[][] sigmaHat = GSON.fromJson(sigma_hat, sigmaType);
-        updateSigma(i, weight, sigmaHat);
+        updateSigma(i, weight, sigmaHat, mu_curr);
     }
 
     // TODO: prevent multiple undesired calls to start()
@@ -437,9 +445,8 @@ public class DCEAgent {
             double[][] sigma_hat = f.sigma; // same ugly optimization
 
             // neither mu will receive updates at this point
-            computeSigmaHat(sigma_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon);
-            updateSigma(i, 1.0 /*selfWeight*/, sigma_hat);
-            // updateSigma(i, mus[currInd(i)]);
+            computeSigmaHat(sigma_hat, mu_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon);
+            updateSigma(i, 1.0 /*selfWeight*/, sigma_hat, mus[currInd(i)]);
 
             // broadcast sigma_hat to neighbors
             publish(jedis, GSON.toJson(sigma_hat), i, Message.PayloadType.SIGMA);
