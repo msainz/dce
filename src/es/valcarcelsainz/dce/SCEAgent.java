@@ -159,7 +159,8 @@ public final class SCEAgent {
             double alpha = computeSmoothingForIteration(iter);
 
             MultivariateGaussianDistribution f =
-                    new MultivariateGaussianDistribution(mu, sigma, new Random(iter));
+                    new MultivariateGaussianDistribution(mu, sigma, new myRandom(iter));
+                    //new MultivariateGaussianDistribution(mu, sigma, new Random(iter));
 
             double [][] xs = new double[numSamples][M];
             double [] ys = new double[xs.length];

@@ -1,17 +1,19 @@
 package es.valcarcelsainz.dce;
 
 import smile.math.Math;
-import smile.math.Random;
+//import smile.math.Random;
 import smile.math.matrix.CholeskyDecomposition;
 
 public class MultivariateGaussianDistribution {
 
     double[] mu;
     double[][] sigma;
-    private Random rng;
+    private myRandom rng;
+    //private Random rng;
     private double[][] sigmaL;
 
-    public MultivariateGaussianDistribution(double[] mean, double[][] cov, Random uniformRandom) {
+    //public MultivariateGaussianDistribution(double[] mean, double[][] cov, Random uniformRandom) {
+    public MultivariateGaussianDistribution(double[] mean, double[][] cov, myRandom uniformRandom) {
         if (mean.length != cov.length) {
             throw new IllegalArgumentException("Mean vector and covariance matrix have different dimension");
         }

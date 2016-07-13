@@ -104,7 +104,7 @@ public class DCEOptimizer {
         parser.addArgument("-s", "--number-samples")
                 .nargs("?")
                 .type(Double.class)
-                .setDefault(100)
+                .setDefault(100.0)
                 .help("initial number of samples");
         parser.addArgument("-rn", "--reg-noise")
                 .nargs("?")
