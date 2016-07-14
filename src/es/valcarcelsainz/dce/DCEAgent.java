@@ -282,9 +282,11 @@ public class DCEAgent {
         double[] numer = new double[M];
         double denom = 0d;
         for (int xsInd = 0; xsInd < numSamples; xsInd++) {
-            double[] x = xs[xsInd];
+            double[] x = new double[M];
+            copy(xs[xsInd], x);
             double y = ys[xsInd];
             double I = smoothIndicator(y, gamma, epsilon);
+            // TODO: Fix this bug: scale(I, x) --> xs[xsInd] = scale(I, x)
             scale(I, x);
             plus(numer, x);
             denom += I;
@@ -299,12 +301,8 @@ public class DCEAgent {
             // using a+bc == b(a/b+c) to avoid
             // allocating a new array
             double[] mu = mus[currInd(i)];
-            double inverse_weight = 1. / weight;
             for (int j = 0; j < mu.length; j++) {
-                mu[j] *= inverse_weight;
-                mu[j] += mu_hat[j];
-                mu[j] *= weight;
-                //mu[j] += weight*mu_hat[j];
+                mu[j] += weight*mu_hat[j];
             }
         }
     }
@@ -319,39 +317,123 @@ public class DCEAgent {
     // new: performs Rx_hat <- (1 - alpha)(sigma_prev + mu_prev * mu_prev^T) + ((alpha / denom) * numer)
     static void computeSigmaHat(double[][] sigma_hat, double[] mu_hat, double[] mu_prev, double[] mu_curr,
                                 double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
-        double[][] B = new double[][]{mu_prev}; // 1 x M
-        plus(sigma_hat, atamm(B)); // M x M
-        scaleA(1d - alpha, sigma_hat);
+
+        boolean meth1 = false;
+        boolean meth2 = false;
+        boolean meth3 = true;
 
         int numSamples = ys.length;
         assert xs.length == ys.length;
         assert xs.length > 0;
         int M = xs[0].length;
-        double[][] numer = new double[M][M];
-        double denom = 0d;
-        for (int xsInd = 0; xsInd < numSamples; xsInd++) {
-            double[] x = xs[xsInd];
-            double y = ys[xsInd];
-            double I = smoothIndicator(y, gamma, epsilon);
-            // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
-            double[][] A = new double[][]{x}; // 1 x M
-            plus(numer, scaleA(I, atamm(A))); // M x M
-            denom += I;
+
+
+        double[][] sigma_hat0 = new double[M][M];
+
+        copy(sigma_hat, sigma_hat0);
+
+
+        double[][] numer1 = new double[M][M];
+        double denom1 = 0d;
+        double[] mu_hat1 = new double[M];
+        double[] mu_prev1 = new double[M];
+        double[][] sigma_hat1 = new double[M][M];
+        if (meth1) {
+            double[] mu_prev0 = new double[M];
+            copy(mu_prev, mu_prev0);
+            double[] mu_hat0 = new double[M];
+            copy(mu_hat, mu_hat0);
+
+            copy(mu_hat0, mu_hat1);
+            copy(mu_prev0, mu_prev1);
+            copy(sigma_hat0, sigma_hat1);
+
+            for (int xsInd = 0; xsInd < numSamples; xsInd++) {
+                double[] x1 = new double[M];
+                copy(xs[xsInd], x1);
+                double y = ys[xsInd];
+                double I = smoothIndicator(y, gamma, epsilon);
+                // old version: (x-mu)*(x-mu)'
+                minus(x1, mu_hat1);
+                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
+                double[][] A = new double[][]{x1}; // 1 x M
+                plus(numer1, scaleA(I, atamm(A))); // M x M
+                denom1 += I;
+            }
+            // old version: (mu_old - mu) * (mu_ol - mu)'  | v1: mu_curr; v2: mu_hat
+            minus(mu_prev1, mu_hat1);
+            double[][] B = new double[][]{mu_prev1}; // 1 x M
+            plus(sigma_hat1, atamm(B)); // M x M
+            scaleA(1d - alpha, sigma_hat1);
+            plus(sigma_hat1, scaleA(alpha / denom1, numer1));
+            logger.info("sigma_hat1: {{}}", sigma_hat1);
+            //logger.info("numer1: {} | denom1: {}", numer1, denom1);
         }
-        plus(sigma_hat, scaleA(alpha / denom, numer));
+
+        double[][] numer2 = new double[M][M];
+        double denom2 = 0d;
+        double[][] sigma_hat2 = new double[M][M];
+        if (meth2) {
+
+            copy(sigma_hat0, sigma_hat2);
+
+            for (int xsInd = 0; xsInd < numSamples; xsInd++) {
+                double[] x = xs[xsInd];
+                double y = ys[xsInd];
+                double I = smoothIndicator(y, gamma, epsilon);
+                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
+                double[][] A = new double[][]{x}; // 1 x M
+                plus(numer2, scaleA(I, atamm(A))); // M x M
+                denom2 += I;
+            }
+            double[][] B = new double[][]{mu_prev}; // 1 x M
+            plus(sigma_hat2, atamm(B)); // M x M
+            scaleA(1d - alpha, sigma_hat2);
+            plus(sigma_hat2, scaleA(alpha / denom2, numer2));
+            double[][] C = new double[][]{mu_hat}; // 1 x M
+            minus(sigma_hat2, atamm(C)); // M x M
+            logger.info("sigma_hat2: {{}}", sigma_hat2);
+            //logger.info("numer2: {} | denom2: {}", numer2, denom2);
+        }
+
+        double[][] numer3 = new double[M][M];
+        double denom3 = 0d;
+        double[][] sigma_hat3 = new double[M][M];
+        if (meth3) {
+            copy(sigma_hat0, sigma_hat3);
+            for (int xsInd = 0; xsInd < numSamples; xsInd++) {
+                double[] x = xs[xsInd];
+                double y = ys[xsInd];
+                double I = smoothIndicator(y, gamma, epsilon);
+                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
+                double[][] A = new double[][]{x}; // 1 x M
+                plus(numer3, scaleA(I, atamm(A))); // M x M
+                denom3 += I;
+            }
+            double[][] B = new double[][]{mu_prev}; // 1 x M
+            plus(sigma_hat3, atamm(B)); // M x M
+            scaleA(1d - alpha, sigma_hat3);
+            plus(sigma_hat3, scaleA(alpha / denom3, numer3));
+            //logger.info("sigma_hat3: {{}}", sigma_hat3);
+            //logger.info("numer3: {} | denom3: {}", numer3, denom3);
+
+
+        }
+
+        copy(sigma_hat3, sigma_hat);
     }
 
     void updateSigma(int i, double weight, double[][] sigma_hat) {
         synchronized (locks[currInd(i)]) {
             double[][] sigma = sigmas[currInd(i)];
             // using a+bc == b(a/b+c) to avoid allocating a new array
-            double inverse_weight = 1. / weight;
+            //double inverse_weight = 1. / weight;
             for (int j = 0; j < sigma.length; j++) {
                 for (int k = 0; k < sigma[0].length; k++) {
-                    sigma[j][k] *= inverse_weight;
-                    sigma[j][k] += sigma_hat[j][k];
-                    sigma[j][k] *= weight;
-                    //sigma[j][k] += weight*sigma_hat[j][k];
+                    //sigma[j][k] *= inverse_weight;
+                    //sigma[j][k] += sigma_hat[j][k];
+                    //sigma[j][k] *= weight;
+                    sigma[j][k] += weight*sigma_hat[j][k];
                 }
             }
         }
@@ -425,11 +507,9 @@ public class DCEAgent {
             // instead of making another deep copy of mu and sigma
             double[] mu_hat = f.mu; // effectively, mus[prevInd(i)]
 
-
             // compute mu_hat of current iteration i, eqn. (32)(top)
             computeMuHat(mu_hat, xs, ys, alpha, gamma, epsilon);
             updateMu(i, selfWeight, mu_hat);
-
 
             // broadcast mu_hat to neighbors
             publish(jedis, GSON.toJson(mu_hat), i, Message.PayloadType.MU);
