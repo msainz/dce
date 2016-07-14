@@ -396,11 +396,12 @@ public class DCEAgent {
             //logger.info("numer2: {} | denom2: {}", numer2, denom2);
         }
 
-        double[][] numer3 = new double[M][M];
-        double denom3 = 0d;
-        double[][] sigma_hat3 = new double[M][M];
+
         if (meth3) {
-            copy(sigma_hat0, sigma_hat3);
+            double[][] numer3 = new double[M][M];
+            double denom3 = 0d;
+            //double[][] sigma_hat3 = new double[M][M];
+            //copy(sigma_hat0, sigma_hat3);
             for (int xsInd = 0; xsInd < numSamples; xsInd++) {
                 double[] x = xs[xsInd];
                 double y = ys[xsInd];
@@ -411,16 +412,21 @@ public class DCEAgent {
                 denom3 += I;
             }
             double[][] B = new double[][]{mu_prev}; // 1 x M
-            plus(sigma_hat3, atamm(B)); // M x M
-            scaleA(1d - alpha, sigma_hat3);
-            plus(sigma_hat3, scaleA(alpha / denom3, numer3));
+            //plus(sigma_hat3, atamm(B)); // M x M
+            //scaleA(1d - alpha, sigma_hat3);
+            //plus(sigma_hat3, scaleA(alpha / denom3, numer3));
+            //copy(sigma_hat3, sigma_hat);
+
+
+            plus(sigma_hat, atamm(B)); // M x M
+            scaleA(1d - alpha, sigma_hat);
+            plus(sigma_hat, scaleA(alpha / denom3, numer3));
             //logger.info("sigma_hat3: {{}}", sigma_hat3);
             //logger.info("numer3: {} | denom3: {}", numer3, denom3);
 
-
         }
 
-        copy(sigma_hat3, sigma_hat);
+
     }
 
     void updateSigma(int i, double weight, double[][] sigma_hat) {

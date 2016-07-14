@@ -23,6 +23,12 @@ public class DCEAgentTest {
     }
 
     @Test
+    public void testSampleNewGaussian() throws Exception {
+
+    }
+
+
+    @Test
     public void testComputeGamma() throws Exception {
         double gamma, gammaQuantile;
 
