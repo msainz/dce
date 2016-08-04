@@ -328,8 +328,8 @@ public class DCEAgent {
         int M = xs[0].length;
 
 
+        /*
         double[][] sigma_hat0 = new double[M][M];
-
         copy(sigma_hat, sigma_hat0);
 
 
@@ -395,6 +395,7 @@ public class DCEAgent {
             logger.info("sigma_hat2: {{}}", sigma_hat2);
             //logger.info("numer2: {} | denom2: {}", numer2, denom2);
         }
+        */
 
 
         if (meth3) {
