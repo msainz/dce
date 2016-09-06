@@ -1,17 +1,17 @@
 package es.valcarcelsainz.dce;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
 import net.sourceforge.argparse4j.ArgumentParsers;
-import net.sourceforge.argparse4j.inf.*;
+import net.sourceforge.argparse4j.inf.ArgumentParser;
+import net.sourceforge.argparse4j.inf.ArgumentParserException;
+import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.PatternLayout;
 import org.apache.log4j.Level;
+import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,23 +30,32 @@ import java.util.*;
  * @author Marcos Sainz
  */
 public class DCEOptimizer {
+    //
     // mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
-    // single process with 3 agents:
+    //
+    // single process with 3 agents (Dejong-2):
     //      MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Dejong -i 500 -r localhost -l info" | grep 'mainThread(0)'
-    // launch 2 processes of 50 agents each:
+    //
+    // single process with 3 agents (Trigonometric-20):
+    //      MAVEN_OPTS="-ea" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/three-nodes.tsv -t Trigonometric -m 20 -i 500 -r localhost -l info"
+    //
+    // launch 2 processes of 50 agents each (Rosenbrock-10):
     //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
     //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Rosenbrock -m 10 -i 5 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
     //
-    //
-// launch 2 processes of 50 agents each:
+    // launch 2 processes of 50 agents each (Pinter-50):
     //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Pinter -m 50 -i 5 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
     //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 50 -t Pinter -m 50 -i 500 -g 0.91 -e 1e7 -s 50 -r localhost -l info"
-
+    //
+    // launch 2 processes of 50 agents each (Dejong-2):
+    //      MAVEN_OPTS="-ea -Xmx4g" mvn clean install exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-w resources/hasting-weights/hundred-nodes-v1.tsv -o 0 -n 50 -t Dejong -m 2 -i 500 -g 0.91 -e 1e3 -s 100 -r localhost -l info"
+    //
     // to begin computations:
     //      redis-cli publish broadcast start
     //
     // to see all argument options:
     //      mvn exec:java -Dexec.mainClass="es.valcarcelsainz.dce.DCEOptimizer" -Dexec.args="-h"
+    //
     public static void main(final String[] args) {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         Path resultsDefaultDirPath = Paths.get(System.getenv("HOME"), ".dce", timeStamp);
