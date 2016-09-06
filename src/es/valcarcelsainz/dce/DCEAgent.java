@@ -20,6 +20,7 @@ import com.google.gson.reflect.TypeToken;
 import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
 import org.apache.log4j.SimpleLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -559,6 +560,8 @@ public class DCEAgent {
         }
         // logger.info("final sigma: {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigmas()[maxIter % 2]);
         logger.info("final mu: {\"mu_{}_{}\": {{}}}", agentId, maxIter, mus[maxIter % 2]);
+
+        LogManager.shutdown();
     }
 
     void logTraceParameters(int i, String msg) {
