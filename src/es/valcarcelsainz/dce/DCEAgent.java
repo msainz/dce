@@ -45,6 +45,12 @@ public class DCEAgent {
     // thread-safe, so we make static to share among agents
     static final Gson GSON = new Gson();
 
+    // list of neighbor-subscriber threads
+    final List<JedisPubSub> neighPubSubs;
+
+    // subscriber to broadcast channel
+    JedisPubSub broadcastPubSub;
+
     final Map<Integer, Double> neighWeights; // TODO: use immutable map
     final int agentId; // k
     final int maxIter;
@@ -107,10 +113,8 @@ public class DCEAgent {
         initParameters();
         clearParameters(1);
 
-        subscribeToBroadcast();
-        subscribeToNeighbors();
-
-        // TODO: jedisPubSub.unsubscribe();
+        this.broadcastPubSub = subscribeToBroadcast();
+        this.neighPubSubs = subscribeToNeighbors();
     }
 
     static double smoothIndicator(double y, double gamma, double epsilon) {
@@ -461,8 +465,12 @@ public class DCEAgent {
         updateSigma(i, weight, sigmaHat);
     }
 
-    // TODO: prevent multiple undesired calls to start()
     public void start() throws IOException {
+
+        // terminate subscription to broadcast channel
+        // so as to avoid multiple calls to start()
+        broadcastPubSub.unsubscribe();
+
         logger.info("agent({}) started", agentId);
         logger.info("connecting to redis at {}:{}", redisHost, redisPort);
         Jedis jedis = new Jedis(redisHost, redisPort);
@@ -561,6 +569,10 @@ public class DCEAgent {
         // logger.info("final sigma: {\"sigma_{}_{}\": {{}}}", agentId, maxIter, ps.getSigmas()[maxIter % 2]);
         logger.info("final mu: {\"mu_{}_{}\": {{}}}", agentId, maxIter, mus[maxIter % 2]);
 
+        // terminate all neighbor-listener threads
+        neighPubSubs.forEach(jedisPubSub -> jedisPubSub.unsubscribe());
+
+        // flush all buffered appenders
         LogManager.shutdown();
     }
 
