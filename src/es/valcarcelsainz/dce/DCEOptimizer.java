@@ -168,9 +168,6 @@ public class DCEOptimizer {
             final double initSamples = parsedArgs.getDouble("number_samples");
             logger.info("initial number samples: {}", initSamples);
 
-            final boolean regNoise = parsedArgs.getBoolean("reg_noise");
-            logger.info("adaptive regularization noise: {}", regNoise);
-
             final String redisHost = parsedArgs.getString("redis_host");
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
@@ -196,7 +193,6 @@ public class DCEOptimizer {
                         upperBound,
                         epsilon,
                         initSamples,
-                        regNoise,
                         redisHost,
                         redisPort,
                         targetFn,

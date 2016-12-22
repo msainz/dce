@@ -59,7 +59,6 @@ public class DCEAgent {
     final double upperBound;
     final double epsilon;
     final double initSamples;
-    final boolean regNoise;
     final String redisHost;
     final int redisPort;
     final Path resultsDirPath;
@@ -91,7 +90,7 @@ public class DCEAgent {
 
     // constructor
     DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter, double gammaQuantile,
-             double lowerBound, double upperBound, double epsilon, double initSamples, boolean regNoise, String redisHost, Integer redisPort,
+             double lowerBound, double upperBound, double epsilon, double initSamples, String redisHost, Integer redisPort,
              GlobalSolutionFunction targetFn, String resultsDirPath) {
 
         this.agentId = agentId;
@@ -102,7 +101,6 @@ public class DCEAgent {
         this.upperBound = upperBound;
         this.epsilon = epsilon;
         this.initSamples = initSamples;
-        this.regNoise = regNoise;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
