@@ -172,7 +172,9 @@ public class DCEOptimizer {
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
 
-            final String resultsDirPath = parsedArgs.getString("results_directory");
+            final String paramSumary = parsedArgs.getList("target_function").get(0) + "_M=" + M
+                    + "_gamma=" + gammaQuantile + "_lb=" + lowerBound + "_ub=" + upperBound;
+            final String resultsDirPath = parsedArgs.getString("results_directory") + "_" + paramSumary;
             logger.info("Results directory path: {}", resultsDirPath);
 
             Map<Integer, Map<Integer, Double>> agentToNeighborWeightsMap =
