@@ -67,11 +67,11 @@ public final class SCEAgent {
         return rmse;
     }
 
-    // TODO: split into initMu and initSigma
-    public static void init(double[] mu, double[][] sigma, final long seed) {
+    // TODO: split into initMu and initCorreMat
+    public static void init(double[] mu, double[][] correMat, final long seed) {
         new Random(seed).nextDoubles(mu, -100d, 100d);
         for (int i = 0; i < mu.length; i++) {
-            sigma[i][i] = 1000;
+            correMat[i][i] = 1000;
         }
     }
 
@@ -120,8 +120,8 @@ public final class SCEAgent {
     }
 
     // see eqn. (32)(bottom)
-    // performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
-    public static void updateSigma(double [][] sigma,
+    // performs correMat <- (1 - alpha)(correMat + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
+    public static void updateCorreMat(double [][] correMat,
                                    double [] mu, double [] mu_prev,
                                    double[][] xs, double[] ys,
                                    double alpha, double gamma, double epsilon) {
@@ -143,12 +143,12 @@ public final class SCEAgent {
         }
         minus(mu_prev, mu);
         double[][] A = new double[][]{mu_prev}; // 1 x M
-        plus(sigma, atamm(A)); // M x M
-        scaleA(1d - alpha, sigma);
-        plus(sigma, scaleA(alpha / denom, numer));
+        plus(correMat, atamm(A)); // M x M
+        scaleA(1d - alpha, correMat);
+        plus(correMat, scaleA(alpha / denom, numer));
     }
 
-    public void maximize(GlobalSolutionFunction J, double [] mu, double [][] sigma, int maxIter) {
+    public void maximize(GlobalSolutionFunction J, double [] mu, double [][] correMat, int maxIter) {
 
         final int M = mu.length;
         LOG.info("initial mu: " + GSON.toJson(mu));
@@ -159,15 +159,15 @@ public final class SCEAgent {
             double alpha = computeSmoothingForIteration(iter);
 
             MultivariateGaussianDistribution f =
-                    new MultivariateGaussianDistribution(mu, sigma, new myRandom(iter));
-                    //new MultivariateGaussianDistribution(mu, sigma, new Random(iter));
+                    //new MultivariateGaussianDistribution(mu, correMat, new myRandom(iter));
+                    new MultivariateGaussianDistribution(mu, correMat, new Random(iter));
 
             double [][] xs = new double[numSamples][M];
             double [] ys = new double[xs.length];
             double gamma = sample(f, J, xs, ys, gammaQuantile);
 
-            LOG.trace(String.format("i: %s | alpha: %s | gamma: %s | J(mu): %s | mu: %s | sigma: %s",
-                    iter, alpha, gamma, J.f(mu), GSON.toJson(mu), GSON.toJson(sigma)));
+            LOG.trace(String.format("i: %s | alpha: %s | gamma: %s | J(mu): %s | mu: %s | correMat: %s",
+                    iter, alpha, gamma, J.f(mu), GSON.toJson(mu), GSON.toJson(correMat)));
 
             // deep copy mu -> mu_prev
             double [] mu_prev = new double[M];
@@ -177,13 +177,13 @@ public final class SCEAgent {
             updateMu(mu, xs, ys, alpha, gamma, epsilon);
             LOG.trace(String.format("i: %s | mu_hat: %s", iter, GSON.toJson(mu)));
 
-            // sigma update -- eqn. (33)
-            updateSigma(sigma, mu, mu_prev, xs, ys, alpha, gamma, epsilon);
-            LOG.trace(String.format("i: %s | sigma_hat: %s", iter, GSON.toJson(sigma)));
+            // correMat update -- eqn. (33)
+            updateCorreMat(correMat, mu, mu_prev, xs, ys, alpha, gamma, epsilon);
+            LOG.trace(String.format("i: %s | correMat_hat: %s", iter, GSON.toJson(correMat)));
             LOG.info(String.format("completed iteration(%s), rmse: %s", iter, rmse(mu, J.getSoln())));
         }
 
-        LOG.info("final sigma: " + GSON.toJson(sigma));
+        LOG.info("final correMat: " + GSON.toJson(correMat));
         LOG.info("final mu: " + GSON.toJson(mu));
         LOG.info("final rmse: " + rmse(mu, J.getSoln()));
     }
@@ -195,7 +195,7 @@ public final class SCEAgent {
         final double epsilon = 1e12;
 
         double [] mu;
-        double [][] sigma;
+        double [][] correMat;
 
         final SCEAgent SACE =
                 new SCEAgent(gammaQuantile, epsilon);
@@ -213,9 +213,9 @@ public final class SCEAgent {
         for (GlobalSolutionFunction J : funs) {
             int M = J.getDim();
             mu = new double[M];
-            sigma = new double[M][M];
-            init(mu, sigma, System.currentTimeMillis());
-            SACE.maximize(J, mu, sigma, maxIter);
+            correMat = new double[M][M];
+            init(mu, correMat, System.currentTimeMillis());
+            SACE.maximize(J, mu, correMat, maxIter);
             logSolnAndPause(J);
         }
     }

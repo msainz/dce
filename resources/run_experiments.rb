@@ -16,7 +16,7 @@ yaml['experiments'].each.with_index do |experiment, i|
     puts "\nExperiment #{i+1}, repetition #{j+1}"
     puts java_cmd
     fork do
-      sleep 10
+      sleep 15
       `redis-cli publish broadcast start`
     end
     system java_cmd

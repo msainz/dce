@@ -81,6 +81,7 @@ public class DCEAgent {
     // mu/sigma_i and mu/sigma_i+1
     double[] mus[] = new double[2][];
     double[][] sigmas[] = new double[2][][];
+    double[][] cov_mat;
 
     // synchronization locks for mu/sigma_i and mu/sigma_i+1
     Object[] locks = new Object[]{
@@ -172,11 +173,18 @@ public class DCEAgent {
                 int M = targetFn.getDim();
                 mus[j] = new double[M];
                 sigmas[j] = new double[M][M];
+
                 long seed = System.currentTimeMillis() + Thread.currentThread().getId();
                 new Random(seed).nextDoubles(mus[j], this.lowerBound, this.upperBound);
-                for (int i = 0; i < mus[j].length; i++) {
-                    sigmas[j][i][i] = 1000;
+
+                cov_mat = new double[M][M];
+                for (int i = 0; i < M; i++) {
+                    cov_mat[i][i] = 1000;
                 }
+
+                double[][] A = new double[][]{mus[j]}; // 1 x M
+                copy(cov_mat, sigmas[j]);
+                plus(sigmas[j], atamm(A)); // M x M
             }
         }
     }
@@ -196,13 +204,13 @@ public class DCEAgent {
     Object[] sampleNewGaussian(int i, double[][] xs, double[] ys, GlobalSolutionFunction J) {
         MultivariateGaussianDistribution f;
         try {
-            f = new MultivariateGaussianDistribution(
-                    // this constructor deep-copies mu[i] and sigma[i]
-                    // later accessible via f.mean() and f.cov() respectively
-                    mus[prevInd(i)], sigmas[prevInd(i)],
-                    new myRandom(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
-                    //new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
-            );
+                f = new MultivariateGaussianDistribution(
+                        // this constructor deep-copies mu[i] and cov_mat
+                        // later accessible via f.mean() and f.cov() respectively.
+                        mus[prevInd(i)], cov_mat,
+                        //new myRandom(System.currentTimeMillis() + Thread.currentThread().getId())
+                        new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
+                );
         } catch (IllegalArgumentException e) {
             //logger.info("{\"mu_{}_{}\": {{}}}", agentId, i - 1, mus[prevInd(i)]);
             //logger.info("{\"sigma_{}_{}\": {{}}}", agentId, i - 1, sigmas[prevInd(i)]);
@@ -261,7 +269,7 @@ public class DCEAgent {
         return pq.last();
     }
 
-    static double computeGamma(double[][] xs, double[] ys, Supplier<double[]> f, Function<double[], Double> jfn, double gammaQuantile) {
+    /*static double computeGamma(double[][] xs, double[] ys, Supplier<double[]> f, Function<double[], Double> jfn, double gammaQuantile) {
         int numSamples = xs.length;
         int M = xs[0].length;
 
@@ -274,7 +282,7 @@ public class DCEAgent {
             gammaFinder.add(y);
         }
         return gammaFinder.quantile(gammaQuantile);
-    }
+    }*/
 
     // see eqn. (32)(top)
     // performs mu <- ((1 - alpha) * mu) + ((alpha / denom) * numer)
@@ -320,143 +328,40 @@ public class DCEAgent {
     // TODO add eqn. number reference <old: see eqn. (32)(bottom)>
     // old: performs sigma <- (1 - alpha)(sigma + (mu_prev - mu)(mu_prev - mu)^T) + ((alpha / denom) * numer)
     // new: performs Rx_hat <- (1 - alpha)(sigma_prev + mu_prev * mu_prev^T) + ((alpha / denom) * numer)
-    static void computeSigmaHat(double[][] sigma_hat, double[] mu_hat, double[] mu_prev, double[] mu_curr,
-                                double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
-
-        boolean meth1 = false;
-        boolean meth2 = false;
-        boolean meth3 = true;
+    static void computeSigmaHat(double[][] sigma_hat, double[][] xs, double[] ys, double alpha, double gamma, double epsilon) {
 
         int numSamples = ys.length;
         assert xs.length == ys.length;
         assert xs.length > 0;
         int M = xs[0].length;
 
-
-        /*
-        double[][] sigma_hat0 = new double[M][M];
-        copy(sigma_hat, sigma_hat0);
-
-
-        double[][] numer1 = new double[M][M];
-        double denom1 = 0d;
-        double[] mu_hat1 = new double[M];
-        double[] mu_prev1 = new double[M];
-        double[][] sigma_hat1 = new double[M][M];
-        if (meth1) {
-            double[] mu_prev0 = new double[M];
-            copy(mu_prev, mu_prev0);
-            double[] mu_hat0 = new double[M];
-            copy(mu_hat, mu_hat0);
-
-            copy(mu_hat0, mu_hat1);
-            copy(mu_prev0, mu_prev1);
-            copy(sigma_hat0, sigma_hat1);
-
-            for (int xsInd = 0; xsInd < numSamples; xsInd++) {
-                double[] x1 = new double[M];
-                copy(xs[xsInd], x1);
-                double y = ys[xsInd];
-                double I = smoothIndicator(y, gamma, epsilon);
-                // old version: (x-mu)*(x-mu)'
-                minus(x1, mu_hat1);
-                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
-                double[][] A = new double[][]{x1}; // 1 x M
-                plus(numer1, scaleA(I, atamm(A))); // M x M
-                denom1 += I;
-            }
-            // old version: (mu_old - mu) * (mu_ol - mu)'  | v1: mu_curr; v2: mu_hat
-            minus(mu_prev1, mu_hat1);
-            double[][] B = new double[][]{mu_prev1}; // 1 x M
-            plus(sigma_hat1, atamm(B)); // M x M
-            scaleA(1d - alpha, sigma_hat1);
-            plus(sigma_hat1, scaleA(alpha / denom1, numer1));
-            logger.info("sigma_hat1: {{}}", sigma_hat1);
-            //logger.info("numer1: {} | denom1: {}", numer1, denom1);
+        double[][] numer = new double[M][M];
+        double denom = 0d;
+        for (int xsInd = 0; xsInd < numSamples; xsInd++) {
+            double[] x = new double[M];
+            copy(xs[xsInd], x);
+            double y = ys[xsInd];
+            double I = smoothIndicator(y, gamma, epsilon);
+            // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
+            double[][] A = new double[][]{x}; // 1 x M
+            plus(numer, scaleA(I, atamm(A))); // M x M
+            denom += I;
         }
-
-        double[][] numer2 = new double[M][M];
-        double denom2 = 0d;
-        double[][] sigma_hat2 = new double[M][M];
-        if (meth2) {
-
-            copy(sigma_hat0, sigma_hat2);
-
-            for (int xsInd = 0; xsInd < numSamples; xsInd++) {
-                double[] x = xs[xsInd];
-                double y = ys[xsInd];
-                double I = smoothIndicator(y, gamma, epsilon);
-                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
-                double[][] A = new double[][]{x}; // 1 x M
-                plus(numer2, scaleA(I, atamm(A))); // M x M
-                denom2 += I;
-            }
-            double[][] B = new double[][]{mu_prev}; // 1 x M
-            plus(sigma_hat2, atamm(B)); // M x M
-            scaleA(1d - alpha, sigma_hat2);
-            plus(sigma_hat2, scaleA(alpha / denom2, numer2));
-            double[][] C = new double[][]{mu_hat}; // 1 x M
-            minus(sigma_hat2, atamm(C)); // M x M
-            logger.info("sigma_hat2: {{}}", sigma_hat2);
-            //logger.info("numer2: {} | denom2: {}", numer2, denom2);
-        }
-        */
-
-
-        if (meth3) {
-            double[][] numer3 = new double[M][M];
-            double denom3 = 0d;
-            //double[][] sigma_hat3 = new double[M][M];
-            //copy(sigma_hat0, sigma_hat3);
-            for (int xsInd = 0; xsInd < numSamples; xsInd++) {
-                double[] x = xs[xsInd];
-                double y = ys[xsInd];
-                double I = smoothIndicator(y, gamma, epsilon);
-                // scale(sqr(alpha * I / denom), x); // faster alternative? or numeric issues?
-                double[][] A = new double[][]{x}; // 1 x M
-                plus(numer3, scaleA(I, atamm(A))); // M x M
-                denom3 += I;
-            }
-            double[][] B = new double[][]{mu_prev}; // 1 x M
-            //plus(sigma_hat3, atamm(B)); // M x M
-            //scaleA(1d - alpha, sigma_hat3);
-            //plus(sigma_hat3, scaleA(alpha / denom3, numer3));
-            //copy(sigma_hat3, sigma_hat);
-
-
-            plus(sigma_hat, atamm(B)); // M x M
-            scaleA(1d - alpha, sigma_hat);
-            plus(sigma_hat, scaleA(alpha / denom3, numer3));
-            //logger.info("sigma_hat3: {{}}", sigma_hat3);
-            //logger.info("numer3: {} | denom3: {}", numer3, denom3);
-
-        }
-
-
+        scaleA(1d - alpha, sigma_hat);
+        plus(sigma_hat, scaleA(alpha / denom, numer));
     }
 
     void updateSigma(int i, double weight, double[][] sigma_hat) {
         synchronized (locks[currInd(i)]) {
             double[][] sigma = sigmas[currInd(i)];
-            // using a+bc == b(a/b+c) to avoid allocating a new array
-            //double inverse_weight = 1. / weight;
+            // alternatively we could use a+bc == b(a/b+c) to avoid allocating a new array
             for (int j = 0; j < sigma.length; j++) {
                 for (int k = 0; k < sigma[0].length; k++) {
-                    //sigma[j][k] *= inverse_weight;
-                    //sigma[j][k] += sigma_hat[j][k];
-                    //sigma[j][k] *= weight;
                     sigma[j][k] += weight*sigma_hat[j][k];
                 }
             }
         }
     }
-
-    void updateSigma(int i) {
-        double[][] sigma = sigmas[currInd(i)];
-        double[][] A = new double[][]{mus[currInd(i)]}; // 1 x M
-        minus(sigma, atamm(A)); // M x M
-    }
-
 
     void updateSigma(int i, double weight, String sigma_hat) {
         Type sigmaType = new TypeToken<double[][]>() {
@@ -464,6 +369,14 @@ public class DCEAgent {
         double[][] sigmaHat = GSON.fromJson(sigma_hat, sigmaType);
         updateSigma(i, weight, sigmaHat);
     }
+
+
+    void updateCovMat(int i) {
+        copy(sigmas[currInd(i)], cov_mat);
+        double[][] A = new double[][]{mus[currInd(i)]}; // 1 x M
+        minus(cov_mat, atamm(A)); // M x M
+    }
+
 
     public void start() throws IOException {
 
@@ -494,13 +407,15 @@ public class DCEAgent {
         Path csvPath = Paths.get(resultsDirPath.toString(), agentIdStr + ".csv");
         csvLogger.addAppender(new FileAppender(new SimpleLayout(), csvPath.toString(), /* append */ false, /* bufferedIO */ true, /* bufferSize */ 1024));
 
+
+        int M = targetFn.getDim();
+
         for (int i = 1; i <= maxIter; i++) {
             Timer.Context iteration_timer_context = iteration_timer.time();
 
             // weight given to our own estimates
             double selfWeight = neighWeights.get(agentId);
 
-            int M = targetFn.getDim();
             numSamples = computeNumSamplesForIteration(i, initSamples);
             alpha = computeSmoothingForIteration(i);
             //logger.info("i: {} | numSamples: {} | alpha:{}", i, numSamples, alpha);
@@ -537,10 +452,12 @@ public class DCEAgent {
             logTraceParameters(i, "before-computeSigmaHat");
 
             // compute sigma_hat of current iteration i, eqn. (33)(top)
-            double[][] sigma_hat = f.sigma; // same ugly optimization
+            //double[][] sigma_hat = f.sigma; // same ugly optimization
+            double[][] sigma_hat = new double[M][M];
+            copy(sigmas[prevInd(i)], sigma_hat);
 
             // neither mu will receive updates at this point
-            computeSigmaHat(sigma_hat, mu_hat, mus[prevInd(i)], mus[currInd(i)], xs, ys, alpha, gamma, epsilon);
+            computeSigmaHat(sigma_hat, xs, ys, alpha, gamma, epsilon);
             updateSigma(i, selfWeight, sigma_hat);
 
             // at this point it's safe to clear mu_i-1 and sigma_i-1
@@ -555,8 +472,9 @@ public class DCEAgent {
 
             synchronized (locks[currInd(i)]) {
 
-                // Convert correlation matrix into covariance matrix
-                updateSigma(i);
+                // Update covariance matrix from correlation matrix and mean
+                //updateSigma(i);
+                updateCovMat(i);
 
                 // Check error
                 double[] mu = mus[currInd(i)];

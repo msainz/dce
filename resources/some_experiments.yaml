@@ -3,7 +3,7 @@ experiment-defaults: &experiment-defaults
   redis-port: 6379
   log-level: info
   gamma-quantile: 0.91
-  epsilon: 1e6
+  epsilon: 1e5
   number-samples: 100
   lower-bound: -50
   upper-bound: 50
@@ -14,14 +14,15 @@ experiments:
     <<: *experiment-defaults
     target-function: Dejong
     dimensionality: 2
-    weights-file: resources/hasting-weights/three-nodes.tsv
+    weights-file: resources/hasting-weights/hundred-nodes-v1.tsv
     max-iterations: 1000
-    epsilon: 1e7
     repetitions: 2
   -
     <<: *experiment-defaults
-    target-function: Trigonometric
-    dimensionality: 20
+    target-function: Shekel
+    dimensionality: 4
+    lower-bound: 0
+    upper-bound: 10
     weights-file: resources/hasting-weights/hundred-nodes-v1.tsv
     max-iterations: 1000
     repetitions: 2

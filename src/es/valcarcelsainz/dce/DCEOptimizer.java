@@ -93,7 +93,7 @@ public class DCEOptimizer {
         parser.addArgument("-g", "--gamma-quantile")
                 .nargs("?")
                 .type(Double.class)
-                .setDefault(0.9)
+                .setDefault(0.99)
                 .help("exploration/exploitation parameter in the range (0, 1), values closer to 1 lower exploration");
         parser.addArgument("-lb", "--lower-bound")
                 .nargs("?")
