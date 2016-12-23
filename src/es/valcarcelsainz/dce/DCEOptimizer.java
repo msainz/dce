@@ -115,6 +115,11 @@ public class DCEOptimizer {
                 .type(Double.class)
                 .setDefault(100.0)
                 .help("initial number of samples");
+        parser.addArgument("-is", "--increase-number-samples")
+                .nargs("?")
+                .type(boolean.class)
+                .setDefault(true)
+                .help("increase number of samples at every iteration");
         parser.addArgument("-rn", "--reg-noise")
                 .nargs("?")
                 .type(Boolean.class)
@@ -168,12 +173,16 @@ public class DCEOptimizer {
             final double initSamples = parsedArgs.getDouble("number_samples");
             logger.info("initial number samples: {}", initSamples);
 
+            final boolean increaseSamples = parsedArgs.getBoolean("increase_number_samples");
+            logger.info("increase number samples: {}", increaseSamples);
+
             final String redisHost = parsedArgs.getString("redis_host");
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
 
             final String paramSumary = parsedArgs.getList("target_function").get(0) + "_M=" + M
-                    + "_gamma=" + gammaQuantile + "_lb=" + lowerBound + "_ub=" + upperBound;
+                    + "_gamma=" + gammaQuantile + "_lb=" + lowerBound + "_ub=" + upperBound
+                    + "_initS=" + initSamples + "_incS=" + increaseSamples;;
             final String resultsDirPath = parsedArgs.getString("results_directory") + "_" + paramSumary;
             logger.info("Results directory path: {}", resultsDirPath);
 
@@ -195,6 +204,7 @@ public class DCEOptimizer {
                         upperBound,
                         epsilon,
                         initSamples,
+                        increaseSamples,
                         redisHost,
                         redisPort,
                         targetFn,
