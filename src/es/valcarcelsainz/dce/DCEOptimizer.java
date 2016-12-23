@@ -108,7 +108,7 @@ public class DCEOptimizer {
         parser.addArgument("-e", "--epsilon")
                 .nargs("?")
                 .type(Double.class)
-                .setDefault(1e6)
+                .setDefault(1e2)
                 .help("slope of smooth indicator function");
         parser.addArgument("-s", "--number-samples")
                 .nargs("?")
@@ -181,6 +181,7 @@ public class DCEOptimizer {
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
 
             final String paramSumary = parsedArgs.getList("target_function").get(0) + "_M=" + M
+                    + "_W=" + parsedArgs.getString("weights_file")
                     + "_gamma=" + gammaQuantile + "_lb=" + lowerBound + "_ub=" + upperBound
                     + "_initS=" + initSamples + "_incS=" + increaseSamples;;
             final String resultsDirPath = parsedArgs.getString("results_directory") + "_" + paramSumary;
