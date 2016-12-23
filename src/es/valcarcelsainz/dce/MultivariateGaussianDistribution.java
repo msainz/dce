@@ -4,7 +4,7 @@ import smile.math.Math;
 import smile.math.Random;
 import smile.math.matrix.CholeskyDecomposition;
 
-public class MultivariateGaussianDistribution {
+public class MultivariateGaussianDistribution implements RandomDistribution {
 
     double[] mu;
     double[][] sigma;

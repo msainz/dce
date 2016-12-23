@@ -201,13 +201,13 @@ public class DCEAgent {
     // which won't receive more updates by the time this method is called
     Object[] sampleNewGaussian(int i, double[][] xs, double[] ys, GlobalSolutionFunction J) {
         MultivariateGaussianDistribution f;
+        long seed = System.currentTimeMillis() + Thread.currentThread().getId();
         try {
                 f = new MultivariateGaussianDistribution(
                         // this constructor deep-copies mu[i] and cov_mat
                         // later accessible via f.mean() and f.cov() respectively.
                         mus[prevInd(i)], cov_mat,
-                        //new myRandom(System.currentTimeMillis() + Thread.currentThread().getId())
-                        new Random(System.currentTimeMillis() + Thread.currentThread().getId()) // TODO: reuse Random instance
+                        new Random(seed) // TODO: reuse Random instance
                 );
         } catch (IllegalArgumentException e) {
             //logger.info("{\"mu_{}_{}\": {{}}}", agentId, i - 1, mus[prevInd(i)]);
@@ -215,26 +215,35 @@ public class DCEAgent {
             logger.info("i: {} | id: {}  singular matrix", i, agentId);
             throw e;
         }
-
-        // TODO refer to eqn. (32)
-        //  2) Que la primera distribución de muestreo sea una uniforme en la
-        //  hyper-box. Es decir, sería algo como
-        //  if (iteración == 1) {
-        //      xs = Uniform( hyperbox );
-        //  } else {
-        //      xs = MultivariateGaussian ( mu, cov );
-        //  }
-
-        //  RandomDistribution h;
-        //  if (1 == i) {
-        //      UniformDistribution g = new UniformDistribution(lBound, uBound);
-        //      h = g;
-        //  } else {
-        //      h = f;
-        //  }
-        //  double gamma = computeGamma2(xs, ys, () -> h.rand(), (double[] x) -> J.f(x), gammaQuantile);
-
         double gamma = computeGamma2(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
+
+
+        /*
+        // First sampling distribution must be uniform in the searching box
+        RandomDistribution f;
+        if (i == 0) {
+            int M = targetFn.getDim();
+            f = new UniformDistribution(this.lowerBound, this.upperBound, M);
+        } else {
+            long seed = System.currentTimeMillis() + Thread.currentThread().getId();
+            try {
+                    f = new MultivariateGaussianDistribution(
+                            // this constructor deep-copies mu[i] and cov_mat
+                            // later accessible via f.mean() and f.cov() respectively.
+                            mus[prevInd(i)], cov_mat,
+                            //new myRandom(System.currentTimeMillis() + Thread.currentThread().getId())
+                            new Random(seed)
+                    );
+            } catch (IllegalArgumentException e) {
+                //logger.info("{\"mu_{}_{}\": {{}}}", agentId, i - 1, mus[prevInd(i)]);
+                //logger.info("{\"sigma_{}_{}\": {{}}}", agentId, i - 1, sigmas[prevInd(i)]);
+                logger.info("i: {} | id: {}  singular matrix", i, agentId);
+                throw e;
+            }
+        }
+        double gamma = computeGamma2(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
+        */
+
         return new Object[]{f, gamma};
     }
 
@@ -450,7 +459,7 @@ public class DCEAgent {
             logTraceParameters(i, "before-computeSigmaHat");
 
             // compute sigma_hat of current iteration i, eqn. (33)(top)
-            //double[][] sigma_hat = f.sigma; // same ugly optimization
+            // removed ugly optimization for diffusion of correlation matrix //double[][] sigma_hat = f.sigma;
             double[][] sigma_hat = new double[M][M];
             copy(sigmas[prevInd(i)], sigma_hat);
 
