@@ -26,6 +26,12 @@ public class Trigonometric extends GlobalSolutionFunction {
     }
 
     @Override
+    public double getOptVal() {
+        double optVal = -1;
+        return optVal;
+    }
+
+    @Override
     public double f(double [] x) {
         checkDim(x);
         double sum = 1.;

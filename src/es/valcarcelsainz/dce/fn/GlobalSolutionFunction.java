@@ -15,7 +15,16 @@ public abstract class GlobalSolutionFunction implements MultivariateFunction {
         return getClass().getSimpleName();
     }
 
+    /**
+     * @return optimal output point
+     */
     public abstract double [] getSoln();
+
+    /**
+     * @return optimal output point
+     */
+    public abstract double getOptVal();
+
 
     /**
      * Return the dimensionality of the function's support.

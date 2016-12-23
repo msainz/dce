@@ -58,7 +58,7 @@ public class DCEOptimizer {
     //
     public static void main(final String[] args) {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        Path resultsDefaultDirPath = Paths.get(System.getenv("HOME"), ".dce", timeStamp);
+        Path resultsDefaultDirPath = Paths.get(System.getenv("HOME"), "dce/results", timeStamp);
         final ArgumentParser parser = ArgumentParsers
                 .newArgumentParser("dce-optimize")
                 .description("Optimize a black-box multivariate function using (Distributed) Cross-Entropy");

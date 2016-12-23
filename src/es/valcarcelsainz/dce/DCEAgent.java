@@ -486,8 +486,9 @@ public class DCEAgent {
                 // Check error
                 double[] mu = mus[currInd(i)];
                 rmse = rmse(mu, targetFn.getSoln());
-                csvLogger.info(String.format("%d, %f, %s", i, rmse, GSON.toJson(mu)));
-                logger.info("completed iteration({}), rmse: {}", i, rmse);
+                double outErr = abs(targetFn.getOptVal() - targetFn.f(mu));
+                csvLogger.info(String.format("%d, %.12f, %.12f, %s", i, outErr, rmse, GSON.toJson(mu)));
+                logger.info("completed iteration({}), outerr: {},  rmse: {}", i, outErr, rmse);
             }
             iteration_timer_context.stop();
         }

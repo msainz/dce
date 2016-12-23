@@ -22,6 +22,12 @@ public class Shekel extends GlobalSolutionFunction {
     }
 
     @Override
+    public double getOptVal() {
+        double optVal = 10.153195850979039;
+        return optVal;
+    }
+
+    @Override
     public double f(double [] x) {
         checkDim(x);
         double [][] a = new double [][] {

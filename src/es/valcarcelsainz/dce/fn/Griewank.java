@@ -27,6 +27,13 @@ public class Griewank extends GlobalSolutionFunction {
     }
 
     @Override
+    public double getOptVal() {
+        double optVal = 0;
+        return optVal;
+    }
+
+
+    @Override
     public double f(double [] x) {
         checkDim(x);
         double sum = 0.;

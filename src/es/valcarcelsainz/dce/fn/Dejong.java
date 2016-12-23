@@ -22,6 +22,13 @@ public class Dejong extends GlobalSolutionFunction {
     }
 
     @Override
+    public double getOptVal() {
+        double optVal = -0.998003838818649;
+        return optVal;
+    }
+
+
+    @Override
     public double f(double [] x) {
         checkDim(x);
         double[][] a = {

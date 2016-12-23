@@ -23,6 +23,12 @@ public class Pinter extends GlobalSolutionFunction {
     }
 
     @Override
+    public double getOptVal() {
+        double optVal = 0;
+        return optVal;
+    }
+
+    @Override
     public double f(double[] _x) {
         checkDim(_x);
         double [] x = new double[M+2];
