@@ -8,6 +8,7 @@ import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
@@ -15,6 +16,7 @@ import org.apache.log4j.PatternLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
@@ -180,10 +182,13 @@ public class DCEOptimizer {
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
 
+
+            String weightsFileName = FilenameUtils.getBaseName(parsedArgs.getString("weights_file"));
             final String paramSumary = parsedArgs.getList("target_function").get(0) + "_M=" + M
-                    + "_W=" + parsedArgs.getString("weights_file")
+                    + "_W=" + weightsFileName
                     + "_gamma=" + gammaQuantile + "_lb=" + lowerBound + "_ub=" + upperBound
-                    + "_initS=" + initSamples + "_incS=" + increaseSamples;;
+                    + "_Sinit=" + initSamples + "_Sinc=" + increaseSamples;
+
             final String resultsDirPath = parsedArgs.getString("results_directory") + "_" + paramSumary;
             logger.info("Results directory path: {}", resultsDirPath);
 
