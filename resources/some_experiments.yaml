@@ -2,27 +2,37 @@ experiment-defaults: &experiment-defaults
   redis-host: localhost
   redis-port: 6379
   log-level: info
+  weights-file: resources/hasting-weights/three-nodes-v1.tsv
+  max-iterations: 500
   gamma-quantile: 0.99
   epsilon: 1e5
   number-samples: 100
-  lower-bound: -50
-  upper-bound: 50
-  reg-noise: false
 
 experiments:
   -
     <<: *experiment-defaults
     target-function: Dejong
     dimensionality: 2
-    weights-file: resources/hasting-weights/hundred-nodes-v1.tsv
-    max-iterations: 1000
-    repetitions: 2
+    lower-bound: -50
+    upper-bound: 50
+    number-samples: 100
+    increase-number-samples: false
+    repetitions: 100
   -
     <<: *experiment-defaults
-    target-function: Shekel
-    dimensionality: 4
-    lower-bound: 0
-    upper-bound: 10
-    weights-file: resources/hasting-weights/hundred-nodes-v1.tsv
-    max-iterations: 1000
-    repetitions: 2
+    target-function: Rosenbrock
+    dimensionality: 10
+    lower-bound: -50
+    upper-bound: 50
+    number-samples: 100
+    increase-number-samples: false
+    repetitions: 100
+  -
+    <<: *experiment-defaults
+    target-function: Griewank
+    dimensionality: 50
+    lower-bound: -50
+    upper-bound: 50
+    number-samples: 100
+    increase-number-samples: false
+    repetitions: 100

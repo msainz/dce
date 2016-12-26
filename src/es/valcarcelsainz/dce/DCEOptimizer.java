@@ -122,11 +122,6 @@ public class DCEOptimizer {
                 .type(boolean.class)
                 .setDefault(true)
                 .help("increase number of samples at every iteration");
-        parser.addArgument("-rn", "--reg-noise")
-                .nargs("?")
-                .type(Boolean.class)
-                .setDefault(false)
-                .help("flag to add regularization noise");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")
                 .choices("trace", "debug", "info")

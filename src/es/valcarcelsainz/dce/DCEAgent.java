@@ -180,7 +180,8 @@ public class DCEAgent {
 
                 cov_mat = new double[M][M];
                 for (int i = 0; i < M; i++) {
-                    cov_mat[i][i] = this.upperBound - this.lowerBound;
+                    //cov_mat[i][i] = this.upperBound - this.lowerBound;
+                    cov_mat[i][i] = 1000;
                 }
 
                 double[][] A = new double[][]{mus[j]}; // 1 x M
@@ -466,7 +467,7 @@ public class DCEAgent {
             logTraceParameters(i, "before-computeSigmaHat");
 
             // compute sigma_hat of current iteration i, eqn. (33)(top)
-            // removed ugly optimization for diffusion of correlation matrix //double[][] sigma_hat = f.sigma;
+            // remove "ugly" optimization since agents diffuse correlation matrix (instead covariance matrix) //double[][] sigma_hat = f.sigma;
             double[][] sigma_hat = new double[M][M];
             copy(sigmas[prevInd(i)], sigma_hat);
 
