@@ -180,7 +180,7 @@ public class DCEAgent {
 
                 cov_mat = new double[M][M];
                 for (int i = 0; i < M; i++) {
-                    cov_mat[i][i] = 1000;
+                    cov_mat[i][i] = this.upperBound - this.lowerBound;
                 }
 
                 double[][] A = new double[][]{mus[j]}; // 1 x M
