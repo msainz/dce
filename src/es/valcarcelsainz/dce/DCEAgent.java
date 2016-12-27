@@ -60,6 +60,7 @@ public class DCEAgent {
     final double epsilon;
     final double initSamples;
     final boolean increaseSamples;
+    final double regNoise;
     final String redisHost;
     final int redisPort;
     final Path resultsDirPath;
@@ -83,7 +84,6 @@ public class DCEAgent {
     double[][] sigmas[] = new double[2][][];
     double[][] cov_mat;
     double[][] identity_mat;
-    static final double reg_noise = 1.0e-9;
 
     // synchronization locks for mu/sigma_i and mu/sigma_i+1
     Object[] locks = new Object[]{
@@ -94,6 +94,7 @@ public class DCEAgent {
     // constructor
     DCEAgent(Integer agentId, Map<Integer, Double> neighWeights, Integer maxIter, double gammaQuantile,
              double lowerBound, double upperBound, double epsilon, double initSamples, boolean increaseSamples,
+             double regNoise,
              String redisHost, Integer redisPort,
              GlobalSolutionFunction targetFn, String resultsDirPath) {
 
@@ -106,6 +107,7 @@ public class DCEAgent {
         this.epsilon = epsilon;
         this.initSamples = initSamples;
         this.increaseSamples = increaseSamples;
+        this.regNoise = regNoise;
         this.redisHost = redisHost;
         this.redisPort = redisPort;
         this.targetFn = targetFn;
@@ -192,7 +194,7 @@ public class DCEAgent {
 
                 identity_mat = new double[M][M];
                 for (int i = 0; i < M; i++) {
-                    identity_mat[i][i] = reg_noise;
+                    identity_mat[i][i] = regNoise;
                 }
             }
         }

@@ -122,6 +122,11 @@ public class DCEOptimizer {
                 .type(boolean.class)
                 .setDefault(true)
                 .help("increase number of samples at every iteration");
+        parser.addArgument("-rn", "--regularization-noise")
+                .nargs("?")
+                .type(Double.class)
+                .setDefault(1.0e-7)
+                .help("initial number of samples");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")
                 .choices("trace", "debug", "info")
@@ -173,6 +178,9 @@ public class DCEOptimizer {
             final boolean increaseSamples = parsedArgs.getBoolean("increase_number_samples");
             logger.info("increase number samples: {}", increaseSamples);
 
+            final double regNoise = parsedArgs.getDouble("regularization_noise");
+            logger.info("regularization noise: {}", regNoise);
+
             final String redisHost = parsedArgs.getString("redis_host");
             final int redisPort = parsedArgs.getInt("redis_port");
             logger.info("Assuming redis server at {}:{}", redisHost, redisPort);
@@ -206,6 +214,7 @@ public class DCEOptimizer {
                         epsilon,
                         initSamples,
                         increaseSamples,
+                        regNoise,
                         redisHost,
                         redisPort,
                         targetFn,
