@@ -10,7 +10,7 @@ experiment-defaults: &experiment-defaults
   gamma-quantile: 0.95
   number-samples: 100
   increase-number-samples: false
-  repetitions: 100
+
 
 
 experiments:
@@ -18,15 +18,19 @@ experiments:
     <<: *experiment-defaults
     target-function: Pinter
     dimensionality: 50
+    repetitions: 3
   -
     <<: *experiment-defaults
     target-function: Trigonometric
     dimensionality: 50
+    repetitions: 3
   -
     <<: *experiment-defaults
     target-function: Powell
     dimensionality: 50
+    repetitions: 3
   -
     <<: *experiment-defaults
     target-function: Griewank
     dimensionality: 50
+    repetitions: 3
