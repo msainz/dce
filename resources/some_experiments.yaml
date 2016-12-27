@@ -18,19 +18,19 @@ experiments:
     <<: *experiment-defaults
     target-function: Pinter
     dimensionality: 50
-    repetitions: 100
+    repetitions: 50
   -
     <<: *experiment-defaults
     target-function: Trigonometric
     dimensionality: 50
-    repetitions: 100
+    repetitions: 50
   -
     <<: *experiment-defaults
     target-function: Powell
     dimensionality: 50
-    repetitions: 100
+    repetitions: 50
   -
     <<: *experiment-defaults
     target-function: Griewank
     dimensionality: 50
-    repetitions: 100
+    repetitions: 50

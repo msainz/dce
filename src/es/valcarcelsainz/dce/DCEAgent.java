@@ -333,7 +333,7 @@ public class DCEAgent {
             scale(alpha / denom, numer);
             plus(mu_hat, numer);
         } else {
-            logger.trace("NaN - alpha: {} | gamma: {} | denom: {} | numer: {}", alpha, gamma, denom, numer);
+            logger.trace("NaN mu_hat - alpha: {} | gamma: {} | denom: {} | numer: {}", alpha, gamma, denom, numer);
         }
 
     }
@@ -376,8 +376,13 @@ public class DCEAgent {
             plus(numer, scaleA(I, atamm(A))); // M x M
             denom += I;
         }
-        scaleA(1d - alpha, sigma_hat);
-        plus(sigma_hat, scaleA(alpha / denom, numer));
+
+        if (denom > 0){
+            scaleA(1d - alpha, sigma_hat);
+            plus(sigma_hat, scaleA(alpha / denom, numer));
+        } else {
+            logger.trace("NaN sigma_hut - alpha: {} | gamma: {} | denom: {} | numer: {}", alpha, gamma, denom, numer);
+        }
     }
 
     void updateSigma(int i, double weight, double[][] sigma_hat) {
