@@ -7,7 +7,6 @@ experiment-defaults: &experiment-defaults
   number-samples: 100
   lower-bound: -50
   upper-bound: 50
-  reg-noise: false
 
 experiments:
   -
