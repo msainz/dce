@@ -85,6 +85,9 @@ public class DCEAgent {
     double[][] cov_mat;
     double[][] identity_mat;
 
+    // number of neighbors
+    double numNeighbors = 0;
+
     // synchronization locks for mu/sigma_i and mu/sigma_i+1
     Object[] locks = new Object[]{
             new Object(),
@@ -325,9 +328,14 @@ public class DCEAgent {
             plus(numer, x);
             denom += I;
         }
-        scale(alpha / denom, numer);
-        scale(1d - alpha, mu_hat);
-        plus(mu_hat, numer);
+        if (denom > 0){
+            scale(1d - alpha, mu_hat);
+            scale(alpha / denom, numer);
+            plus(mu_hat, numer);
+        } else {
+            logger.trace("NaN - alpha: {} | gamma: {} | denom: {} | numer: {}", alpha, gamma, denom, numer);
+        }
+
     }
 
     void updateMu(int i, double weight, double[] mu_hat) {
@@ -470,9 +478,11 @@ public class DCEAgent {
             // broadcast mu_hat to neighbors
             publish(jedis, GSON.toJson(mu_hat), i, Message.PayloadType.MU);
 
-            // compute mu, eqn. (32)(bottom)
-            // wait for all neighbors' mu_hat for current iteration i
-            muPhaser.awaitAdvance(i - 1); // phase is 0-based
+            if (numNeighbors >0) {
+                // compute mu, eqn. (32)(bottom)
+                // wait for all neighbors' mu_hat for current iteration i
+                muPhaser.awaitAdvance(i - 1); // phase is 0-based
+            }
 
             logTraceParameters(i, "before-computeSigmaHat");
 
@@ -491,9 +501,11 @@ public class DCEAgent {
             // broadcast sigma_hat to neighbors
             publish(jedis, GSON.toJson(sigma_hat), i, Message.PayloadType.SIGMA);
 
-            // compute sigma, eqn. (33)(bottom)
-            // wait for all neighbors' sigma_hat for current iteration i
-            sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
+            if (numNeighbors >0) {
+                // compute sigma, eqn. (33)(bottom)
+                // wait for all neighbors' sigma_hat for current iteration i
+                sigmaPhaser.awaitAdvance(i - 1); // phase is 0-based
+            }
 
             synchronized (locks[currInd(i)]) {
 
@@ -602,6 +614,8 @@ public class DCEAgent {
                 // do not subscribe to self
                 continue;
             }
+
+            numNeighbors++;
 
             final JedisPubSub neighPubSub = new JedisPubSub() {
                 @Override
