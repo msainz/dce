@@ -6,9 +6,9 @@ clear
 basename = '/home/love/dce/results/';
 
 
-% foldername = 'Pinter_M=50_W=hasting_weights_nodes_10_graph_1_gamma=0.95_lb=-50.0_ub=50.0_Sinit=100.0_Sinc=false';
+foldername = 'Pinter_M=50_W=hasting_weights_nodes_10_graph_1_gamma=0.95_lb=-50.0_ub=50.0_Sinit=100.0_Sinc=false';
 % foldername = '20161227_020834_Pinter_M=50_W=hasting_weights_nodes_10_graph_1_gamma=0.95_lb=-50.0_ub=50.0_Sinit=100.0_Sinc=false';
-foldername = 'Griewank_M=50_W=hasting_weights_nodes_10_graph_1_gamma=0.95_lb=-50.0_ub=50.0_Sinit=100.0_Sinc=false';
+% foldername = 'Griewank_M=50_W=hasting_weights_nodes_10_graph_1_gamma=0.95_lb=-50.0_ub=50.0_Sinit=100.0_Sinc=false';
 
 f = dir(basename);
 num_dirs = size(f);
@@ -24,8 +24,9 @@ for i = 1 : num_dirs
             include_values(optsol_err_dir, optval_err_dir, num_it_dir, ...
                 optsol_err, optval_err, num_it);
         semilogy(1:num_it,[optval_err, optsol_err])
-        legend({'optval err', 'optsol err'})
+        drawnow
     end
+    i
 end
 
 

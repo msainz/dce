@@ -82,6 +82,8 @@ public class DCEAgent {
     double[] mus[] = new double[2][];
     double[][] sigmas[] = new double[2][][];
     double[][] cov_mat;
+    double[][] identity_mat;
+    static final double reg_noise = 1.0e-9;
 
     // synchronization locks for mu/sigma_i and mu/sigma_i+1
     Object[] locks = new Object[]{
@@ -187,6 +189,11 @@ public class DCEAgent {
                 double[][] A = new double[][]{mus[j]}; // 1 x M
                 copy(cov_mat, sigmas[j]);
                 plus(sigmas[j], atamm(A)); // M x M
+
+                identity_mat = new double[M][M];
+                for (int i = 0; i < M; i++) {
+                    identity_mat[i][i] = reg_noise;
+                }
             }
         }
     }
@@ -204,8 +211,10 @@ public class DCEAgent {
     // create new surrogate gaussian with mu and sigma from prev iteration
     // which won't receive more updates by the time this method is called
     Object[] sampleNewGaussian(int i, double[][] xs, double[] ys, GlobalSolutionFunction J) {
-        MultivariateGaussianDistribution f;
+        final MultivariateGaussianDistribution f;
         long seed = System.currentTimeMillis() + Thread.currentThread().getId();
+        plus(cov_mat, identity_mat); // Regularize with with small diagonal noise to force positive definite covariance
+                                     // and be able to reduce the number of samples per node.
         try {
                 f = new MultivariateGaussianDistribution(
                         // this constructor deep-copies mu[i] and cov_mat
@@ -220,7 +229,6 @@ public class DCEAgent {
             throw e;
         }
         double gamma = computeGamma2(xs, ys, () -> f.rand(), (double[] x) -> J.f(x), gammaQuantile);
-
 
         /*
         // First sampling distribution must be uniform in the searching box
@@ -495,7 +503,8 @@ public class DCEAgent {
                 double[] mu = mus[currInd(i)];
                 rmse = rmse(mu, targetFn.getSoln());
                 double outErr = abs(targetFn.getOptVal() - targetFn.f(mu));
-                csvLogger.info(String.format("%d, %.12f, %.12f, %s", i, outErr, rmse, GSON.toJson(mu)));
+                //csvLogger.info(String.format("%d, %.12f, %.12f, %s", i, outErr, rmse, GSON.toJson(mu)));
+                csvLogger.info(String.format("%d, %.12f, %.12f", i, outErr, rmse));
                 logger.info("completed iteration({}), outerr: {},  rmse: {}", i, outErr, rmse);
             }
             iteration_timer_context.stop();

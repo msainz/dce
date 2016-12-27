@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/dce-parent.iml" filepath="$PROJECT_DIR$/dce-parent.iml" />
+      <module fileurl="file://$PROJECT_DIR$/dce.iml" filepath="$PROJECT_DIR$/dce.iml" />
     </modules>
   </component>
 </project>
