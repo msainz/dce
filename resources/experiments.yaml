@@ -14,7 +14,7 @@ experiments:
     <<: *experiment-defaults
     target-function: Dejong
     dimensionality: 2
-    weights-file: resources/hasting-weights/three-nodes.tsv
+    weights-file: resources/hasting-weights/hasting_weights_nodes_10_graph_1.txt
     max-iterations: 1000
     epsilon: 1e7
     repetitions: 2
