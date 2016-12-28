@@ -27,7 +27,7 @@ public class Trigonometric extends GlobalSolutionFunction {
 
     @Override
     public double getOptVal() {
-        double optVal = -1;
+        double optVal = -1.0;
         return optVal;
     }
 

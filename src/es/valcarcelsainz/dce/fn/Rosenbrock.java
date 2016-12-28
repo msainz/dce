@@ -27,7 +27,7 @@ public class Rosenbrock extends GlobalSolutionFunction  {
 
     @Override
     public double getOptVal() {
-        double optVal = 0;
+        double optVal = 0.0;
         return optVal;
     }
 

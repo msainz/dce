@@ -70,7 +70,8 @@ public class DCEOptimizer {
         parser.addArgument("-t", "--target-function")
                 .nargs(1)
                 .required(true)
-                .choices("Dejong", "Griewank", "Pinter", "Powell", "Rosenbrock", "Shekel", "Trigonometric")
+                .choices("Dejong", "Griewank", "Pinter", "Powell", "Rosenbrock", "Shekel", "Trigonometric"
+                        , "Zakharov", "Rastrigin", "Ackley", "Levy", "Brown")
                 .help("target function to optimize (default: Pinter)");
         parser.addArgument("-m", "--dimensionality")
                 .nargs("?")
@@ -125,7 +126,7 @@ public class DCEOptimizer {
         parser.addArgument("-rn", "--regularization-noise")
                 .nargs("?")
                 .type(Double.class)
-                .setDefault(1.0e-7)
+                .setDefault(1.0e-6)
                 .help("initial number of samples");
         parser.addArgument("-l", "--log-level")
                 .nargs("?")

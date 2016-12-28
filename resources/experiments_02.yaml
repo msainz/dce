@@ -1,0 +1,45 @@
+experiment-defaults: &experiment-defaults
+  redis-host: localhost
+  redis-port: 6379
+  log-level: info
+  epsilon: 1e5
+  max-iterations: 1000
+  weights-file: resources/hasting-weights/hasting_weights_nodes_20_graph_1.txt
+  lower-bound: -50
+  upper-bound: 50
+  gamma-quantile: 0.9
+  number-samples: 100
+  increase-number-samples: false
+
+
+
+experiments:
+  -
+    <<: *experiment-defaults
+    target-function: Ackley
+    dimensionality: 50
+    repetitions: 34
+  -
+    <<: *experiment-defaults
+    target-function: Zakharov
+    dimensionality: 50
+    repetitions: 50
+  -
+    <<: *experiment-defaults
+    target-function: Dejong
+    dimensionality: 2
+    number-samples: 50
+    gamma-quantile: 0.99
+    repetitions: 50
+  -
+    <<: *experiment-defaults
+    target-function: Rosenbrock
+    dimensionality: 20
+    gamma-quantile: 0.95
+    max-iterations: 2000
+    repetitions: 50
+  -
+    <<: *experiment-defaults
+    target-function: Shekel
+    dimensionality: 4
+    repetitions: 50

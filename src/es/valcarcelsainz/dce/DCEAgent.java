@@ -16,6 +16,7 @@ import com.codahale.metrics.JmxReporter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import es.valcarcelsainz.dce.fn.GlobalSolutionFunction;
 import org.apache.log4j.FileAppender;
@@ -44,6 +45,9 @@ public class DCEAgent {
 
     // thread-safe, so we make static to share among agents
     static final Gson GSON = new Gson();
+    /*Gson GSON = new GsonBuilder()
+            .serializeSpecialFloatingPointValues()
+            .create();*/
 
     // list of neighbor-subscriber threads
     final List<JedisPubSub> neighPubSubs;
@@ -266,7 +270,6 @@ public class DCEAgent {
 
     static double computeGamma2(double[][] xs, double[] ys, Supplier<double[]> f, Function<double[], Double> jfn, double gammaQuantile) {
         int numSamples = xs.length;
-        int M = xs[0].length;
         int maximumSize = (int) Math.round(numSamples * gammaQuantile);
         TreeSet<Double> pq = new TreeSet(Comparator.<Double>naturalOrder());
 
@@ -328,12 +331,12 @@ public class DCEAgent {
             plus(numer, x);
             denom += I;
         }
-        if (denom > 0){
+        if (denom > 1.0e-7){
             scale(1d - alpha, mu_hat);
             scale(alpha / denom, numer);
             plus(mu_hat, numer);
         } else {
-            logger.trace("NaN mu_hat - alpha: {} | gamma: {} | denom: {} | numer: {}", alpha, gamma, denom, numer);
+            logger.trace("NaN mu_hat - alpha: {} | gamma: {} | denom: {}", alpha, gamma, denom);
         }
 
     }
@@ -377,11 +380,11 @@ public class DCEAgent {
             denom += I;
         }
 
-        if (denom > 0){
+        if (denom > 1.0e-7){
             scaleA(1d - alpha, sigma_hat);
             plus(sigma_hat, scaleA(alpha / denom, numer));
         } else {
-            logger.trace("NaN sigma_hut - alpha: {} | gamma: {} | denom: {} | numer: {}", alpha, gamma, denom, numer);
+            logger.trace("NaN sigma_hat - alpha: {} | gamma: {} | denom: {}", alpha, gamma, denom);
         }
     }
 
